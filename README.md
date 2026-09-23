@@ -1,139 +1,236 @@
-# Tiger Short/Long Memory
+# Tiger-Short-Long-Memory
+(以下共花費約40天)
 
-Tiger Short/Long Memory is a local SQLite prototype for safe short-term and
-long-term conversational memory. Its active product mode is a
-**Human-Reviewed Memory Assistant**: the model may propose a semantic memory
-change, but only an explicit local Confirm can commit that proposal to
-authoritative Current Memory.
+Tiger-Short-Long-Memory 是一個本機長短期記憶系統原型
+- 第3次實作才成功(codex: pro帳號-USD100，大約花費5、6天)。 是將 "https://www.youtube.com/watch?v=XQXMSc0L5DA&t=356s" ，轉為文字    (位於Tiger-Short-Long-Memory\技術文件\LLM 記憶系統完整技術報告.txt)
 
-Production automatic semantic writes are disabled. A frozen held-out benchmark
-observed one unsafe auto-commit and triggered the project's mandatory stop rule.
+          通過"20個測試案例.txt"的手動測試。
+		  Tiger-Short-Long-Memory_系統架構.docx
 
-## Architecture summary
+- 第1次是叫gpt去找20篇LLM記憶相關的論文，去實作，結果失敗。(花費約30天)
+- 第2次是google幾篇LLM的短中期記憶文章，結果失敗，其它包含亞馬遜幾篇相關技術文件。
+- chatgpt: https://chatgpt.com/share/6ab34b85-2808-83ee-b576-6617cae6416d
+- codex: https://chatgpt.com/s/cx_6ab34bbde7f08191a277fe2ae9ddceb2
+
+目標是驗證：
+
+- 可持久化的長期記憶
+- Current / Previous / History lineage
+- 使用者隔離
+- Scalar 與 Collection / Membership 記憶
+- 明確的 Confirm / Cancel / stale protection
+- SQLite 交易一致性與資料完整性
+
+目前專案同時保留兩條實驗路線：
+
+1. **自然語言 Memory Runtime**：由 LLM 理解使用者語句後操作記憶。
+
+        目前通過"20個測試案例.txt"的手動測試。
+
+2. **Structured Memory V2**：使用明確欄位與 deterministic operation 操作記憶，不依賴 LLM semantic routing。
+
+---
+
+## 目前狀態
+
+### Natural-Language Memory Runtime
+
+已完成並實際測試：
+
+- Scalar 記憶建立與更新
+- Current read
+- Previous read
+- correction / predecessor continuity
+- user/session isolation
+- clarification / pending safety
+- collection / membership 行為
+- cross-collection isolation
+- long-session memory consistency
+
+近期人工測試已成功驗證：
+
+- 辦公室：`台北 -> 新竹`，Current=`新竹`，Previous=`台北`
+- 車色：`白色 -> 黑色`，Current=`黑色`，Previous=`白色`
+- 20-case 人工流程完整通過
+- hypothetical case：`如果我搬到高雄，我可能會住左營` 不會覆蓋 Current residence，而是保留為可能住處資訊
+
+> 注意：自然語言 semantic interpretation 仍屬 probabilistic behavior，不能視為 deterministic guarantee。
+
+---
+
+### Structured Memory V2
+
+Structured Memory V2 已完成並封版為：
+
+**Validated Structured Memory V2 Local MVP**
+
+已驗證：
+
+- deterministic scalar core
+- stable `memory_id` lineage
+- `entity_id` / `semantic_key` 分離
+- 多 entity 共用同一 semantic key
+- A -> B -> C predecessor continuity
+- Current / Previous
+- idempotent reassertion
+- collection / membership
+- count-only collection
+- cross-collection isolation
+- user isolation
+- stale / duplicate confirmation protection
+- restart persistence
+- SQLite integrity validation
+- ResourceWarning clean
+
+Structured Memory V2 不依賴 DeepSeek，且不整合失敗的 V2-1A semantic adapter。
+
+---
+
+## 專案結構
+
+主要檔案：
 
 ```text
-User input
-  -> DeepSeek semantic extraction
-  -> structural / grounding / registry validation
-  -> deterministic compiler and typed preconditions
-  -> immutable Pending Semantic Confirmation
-  -> explicit local Confirm
-  -> atomic SQLite Current / History / revision commit
-  -> Current-only context
-  -> bounded answer, decision, and tool gates
+Tiger-Short-Long-Memory/
+├─ app.py
+├─ structured_app.py
+├─ memory_core.py
+├─ memory_runtime.py
+├─ memory_answer.py
+├─ memory_proposal.py
+├─ memory_audit.py
+├─ memory_recovery.py
+├─ memory_operations.py
+├─ memory_release.py
+├─ memory_v2/
+│  ├─ __init__.py
+│  └─ core.py
+├─ memory_v2_semantic/
+│  ├─ semantic_adapter.py
+│  ├─ semantic_models.py
+│  └─ semantic_validator.py
+├─ structured_ui/
+│  └─ index.html
+├─ structured_integrity.py
+├─ tests/
+└─ docs/
 ```
 
-The model never writes SQLite directly. Stable `memory_id` identifies a
-lineage. Current, History, Pending Proposal, Clarification, recent conversation,
-and audit evidence remain separate authority layers.
+---
 
-Detailed documentation:
-
-- [Structured Memory V2 local MVP](docs/STRUCTURED_MEMORY_V2.md)
-- [Structured Memory V2 release status](docs/STRUCTURED_MEMORY_V2_RELEASE_STATUS.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Memory model](docs/MEMORY_MODEL.md)
-- [Security](docs/SECURITY.md)
-- [Operations](docs/OPERATIONS.md)
-- [Validation report](docs/VALIDATION_REPORT.md)
-- [Final project status](docs/FINAL_PROJECT_STATUS.md)
-- [Release checklist](RELEASE_CHECKLIST.md)
-- [Release freeze](RELEASE_FREEZE.md)
-
-## Quick start
-
-Requirements:
+## 環境
 
 - Windows
-- Python 3.14-compatible runtime
-- `DEEPSEEK_API_KEY` for live chat
+- Python 3.11.3
+- SQLite
+- DeepSeek official API（自然語言版）
 
-From the project directory:
+建議使用既有虛擬環境：
 
-```bat
-set DEEPSEEK_API_KEY=your-key
-start.cmd
+```powershell
+D:\0TIGER\6months\PythonAPIDevelopment\venv_multi_query\Scripts\python.exe
 ```
 
-Open `http://127.0.0.1:18080/`.
+---
 
-The runtime uses `deepseek-v4-pro`, the existing DeepSeek chat-completions
-endpoint, disabled thinking, and a maximum output budget of 4,096 tokens.
-Confirm and Cancel make zero provider calls.
+## 啟動自然語言版
 
-## Testing
+在專案根目錄執行：
 
-Required 20-test regression:
+```powershell
+D:\0TIGER\6months\PythonAPIDevelopment\venv_multi_query\Scripts\python.exe .\app.py --db manual_test.db --port 18080
+```
 
-```bat
+瀏覽器：
+
+```text
+http://127.0.0.1:18080
+```
+
+請使用獨立測試 DB，避免直接操作既有驗收或 release DB。
+
+---
+
+## 啟動 Structured Memory V2
+
+```powershell
+D:\0TIGER\6months\PythonAPIDevelopment\venv_multi_query\Scripts\python.exe .\structured_app.py --db structured_memory.db --port 18081
+```
+
+瀏覽器：
+
+```text
+http://127.0.0.1:18081
+```
+
+Structured Memory V2 使用 explicit structured fields + Prepare -> Confirm，所有 authoritative mutation 由 deterministic V2 core 執行。
+
+---
+
+## 測試
+
+### Natural-Language Runtime
+
+```powershell
 python -W error::ResourceWarning -m unittest -v test_app.py
 ```
 
-Phase 5B benchmark-tool tests:
+### V2 Core
 
-```bat
-python -W error::ResourceWarning -m unittest -v test_memory_benchmark.py
+```powershell
+python -W error::ResourceWarning -m pytest -q tests/test_memory_v2_core.py
 ```
 
-Extended offline suite when pytest is available:
+### Structured Scalar UI
 
-```bat
-D:\python3.11.3\python.exe -W error::ResourceWarning -m pytest -q
+```powershell
+python -W error::ResourceWarning -m pytest -q tests/test_structured_app.py
 ```
 
-Real-provider gates are opt-in and disabled by default. Do not treat mock or
-offline results as live DeepSeek evidence. Tests must use explicit temporary or
-dedicated databases and must not open protected production databases through
-SQLite.
+### Structured Collection UI
 
-## Safety model
+```powershell
+python -W error::ResourceWarning -m pytest -q tests/test_structured_collections.py
+```
 
-- Only `user1` and `user2` are admitted.
-- Model-derived changed writes require an immutable proposal and explicit
-  human confirmation.
-- Confirm revalidates user, session, proposal identity, revision, Current state,
-  typed preconditions, and exact persisted payload.
-- Provider, schema, validation, firewall, revision, and database failures leave
-  the attempted turn unchanged.
-- Configured credential-like attributes are rejected by the Phase 1B/4D
-  validation gates; the product does not claim universal detection or
-  prohibition of arbitrary sensitive personal facts. Prompt-injection
-  attempts cannot bypass the memory write boundary.
-- No write transaction is held while waiting for the provider.
-- Audit details use privacy-safe tokens and must not contain raw secrets.
-- Production auto-commit and the archived automatic benchmark are locked.
+### Structured Release
 
-## Supported memory model
+```powershell
+python -W error::ResourceWarning -m pytest -q tests/test_structured_release.py
+```
 
-The typed runtime supports Scalar, Set, Count, and Record state. Replacements
-preserve stable lineage and archive complete predecessors. Relation membership
-is represented through Set state. Same-value reassertions are `NOOP` operations.
-Destructive operations are visibly marked and remain pending until Confirm.
+---
 
-## Current limitations
+## 已知限制
 
-- This is a localhost prototype, not a multi-tenant production service.
-- User scope is fixed to `user1` and `user2`.
-- Natural-language intent, slot, target, claim-shape, and literal selection
-  remain model-semantic and can be wrong while structurally valid.
-- Human confirmation is an authorization step, not proof of objective truth.
-- No vector database, embeddings, RAG, summary memory, procedural memory,
-  LangGraph, multi-agent runtime, or self-learning is included.
-- Operational, audit, recovery, decision, action, and benchmark modules are
-  focused gates; not every gate is automatically composed into `start.cmd`.
-- Bonsai 2 27B was unavailable during Phase 5B, so no DeepSeek-versus-Bonsai
-  comparison exists.
-- Automatic semantic memory failed its frozen safety benchmark and must remain
-  disabled for the current architecture/model.
+- Natural-language semantic interpretation 不是 deterministic。
+- V2-1A natural-language semantic adapter 曾進行 real DeepSeek gate，但 critical semantic accuracy 未達 release threshold，因此未整合。
+- Structured Memory V2 可靠，但 UX 比自由聊天更受限。
+- 專案目前定位為本機驗證型 MVP，不是 enterprise production deployment。
 
-## Governance
+---
 
-Memory behavior is governed by:
+## 專案原則
 
-- `MEMORY_CONSISTENCY_SPEC.md`
-- `MEMORY_SEMANTIC_CONTRACTS.md`
-- `MEMORY_ACCEPTANCE_SUITE.md`
+- 不針對個別 slot / domain 做 case-by-case hardcode。
+- History lookup 不應 fallback 到 Current。
+- 所有 destructive mutation 必須 fail closed。
+- user isolation 與 collection isolation 為硬性要求。
+- reassertion 應為 NO_OP，不建立重複 Current 或破壞 predecessor。
+- 測試與人工驗收使用獨立 DB。
+- 不將 API key、SQLite DB、cache、logs 或其他本機敏感資料提交到 Git。
 
-Architecture and implementation plans do not override these documents. Any
-future semantic change must follow their change-control process before runtime
-code changes.
+---
+
+## Release Summary
+
+```text
+Deterministic Memory Core      PASS
+Natural-Language Runtime       MANUAL ACCEPTANCE PASS
+Structured Scalar UI           PASS
+Structured Collection UI       PASS
+Restart Persistence            PASS
+Integrity Validation           PASS
+Structured Memory V2 Release   PASS
+DeepSeek in Structured V2      NOT REQUIRED
+```
