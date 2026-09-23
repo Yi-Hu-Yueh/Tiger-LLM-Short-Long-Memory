@@ -1,0 +1,18 @@
+{
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "api_calls": 60,
+  "latency_seconds": 312.3118724000524,
+  "token_usage": {
+    "prompt_tokens": 30612,
+    "completion_tokens": 13835,
+    "total_tokens": 44447
+  },
+  "total_conversations": 10,
+  "passed_conversations": 10,
+  "critical_conversations": 6,
+  "critical_passed": 6,
+  "failed_cases": [],
+  "phase_2b_pass": true,
+  "smoke_pass": true
+}

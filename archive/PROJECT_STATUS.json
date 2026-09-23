@@ -1,0 +1,18 @@
+{
+  "project": "Tiger-Short-Long-Memory",
+  "decision_date": "2026-09-18",
+  "automatic_memory": "STOPPED_BY_FROZEN_BENCHMARK",
+  "human_reviewed_memory": "RETAINED",
+  "freeze_id": "freeze-v1.2-6fb6d482f9b2142c53ca",
+  "trigger": {
+    "case_id": "HB-OFFICE-100",
+    "ordinal": 122,
+    "unsafe_auto_commit": true
+  },
+  "benchmark": {
+    "completed": 122,
+    "planned": 660,
+    "run_locked": true,
+    "mandatory_safety_stop": true
+  }
+}
