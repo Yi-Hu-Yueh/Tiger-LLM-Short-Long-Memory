@@ -1,0 +1,859 @@
+#1 — 辦公室基本記憶 HARD
+
+問 1：	開始實作此系統，不要中斷，一直到結束為止:
+
+我的辦公室在台北。
+
+預期答：
+
+已記住／Memory saved.
+（字面不限）
+
+Memory 預期： 建立「我的辦公室 = 台北」的 current fact。
+
+問 2：
+
+我的辦公室在哪裡？
+
+預期答：
+
+台北。
+
+✅ 這題不能 safe degrade。
+
+#2 — 辦公室更正與歷史 HARD + OPTIONAL
+
+前置：#1 已經記住「台北」。
+
+問 1：
+
+更正，我的辦公室其實在新竹。
+
+預期答：
+
+已更新／已更正為新竹。
+
+Memory 預期：
+
+台北 → superseded
+新竹 → current
+同一個 semantic slot
+新竹的 predecessor 是台北
+
+問 2：
+
+我的辦公室在哪裡？
+
+預期答：
+
+新竹。
+
+問 3：
+
+我之前說我的辦公室在哪裡？
+
+理想預期答：
+
+台北。
+
+這一問的自然語言 predecessor automation 是 OPTIONAL；如果 Tiger 安全地表示目前不支援這種歷史自然語言讀取，也可以通過，但底層 predecessor continuity 必須存在。
+
+#3 — 研究小組三人 OPTIONAL
+
+問 1：
+
+我的研究小組有三位成員：Alice、Bob、Carol。
+
+若 automation 成功，預期答：
+
+已記住研究小組成員。
+
+問 2：
+
+研究小組現在有幾個成員？
+
+若成功，預期答：
+
+3 位。
+
+預期成員：
+
+Alice、Bob、Carol
+
+如果 composition automation 尚未安全成立，可以 typed safe degradation。
+
+❌ 不能自己發明第四個人。
+❌ 不能說已記住但其實沒有 canonical state。
+
+#4 — 實驗室兩人，與研究小組隔離 OPTIONAL
+
+問 1：
+
+我的實驗室有兩位成員：Bob、David。
+
+若成功，預期答：
+
+已記住。
+
+問 2：
+
+實驗室現在有幾個成員？
+
+若成功，預期答：
+
+2 位。
+
+預期：
+
+Bob、David
+
+重要的是 Bob 同時存在於研究小組與實驗室時，兩個 collection 不能合併。
+
+#5 — Bob 只退出研究小組 OPTIONAL
+
+前置若 #3/#4 automation 成功：
+
+研究小組：
+
+Alice、Bob、Carol
+
+實驗室：
+
+Bob、David
+
+問 1：
+
+Bob 退出研究小組了。
+
+如果 production policy 要 confirmation：
+
+系統：
+
+請確認是否執行。
+
+問 1A：
+
+確認執行。
+
+預期結果：
+
+研究小組變成：
+
+Alice、Carol
+
+Bob 在研究小組中的 membership 被 retract。
+
+但實驗室必須仍然：
+
+Bob、David
+
+問 2：
+
+研究小組現在有哪些成員？
+
+預期答：
+
+Alice、Carol。
+
+問 3：
+
+實驗室現在有哪些成員？
+
+預期答：
+
+Bob、David。
+
+這題最重要的是：
+
+退出研究小組不能把 Bob 從實驗室一起刪掉。
+
+#6 — Bob 再加入研究小組 OPTIONAL
+
+前置：#5 成功時研究小組是 Alice、Carol。
+
+問 1：
+
+Bob 又加入研究小組了。
+
+若成功，預期答：
+
+已重新加入。
+
+問 2：
+
+研究小組現在有哪些成員？
+
+預期答：
+
+Alice、Bob、Carol。
+
+問 3：
+
+實驗室現在有哪些成員？
+
+預期答：
+
+Bob、David。
+
+不能產生兩個 active Bob membership。
+
+#7 — 車子顏色基本 scalar HARD
+
+問 1：我的車是白色
+
+
+
+預期答：
+
+已記住。
+
+問 2：
+
+我的車是什麼顏色？
+
+預期答：
+
+白色。
+
+✅ 必須 canonical success。
+
+#8 — 車色更正與 predecessor HARD + OPTIONAL
+
+前置：#7 = 白色。
+
+問 1：
+
+更正，我的車其實是黑色的。
+
+預期答：
+
+已更正為黑色。
+
+Memory：
+
+白色 → superseded
+黑色 → current
+semantic slot 不變
+
+問 2：
+
+我的車現在是什麼顏色？
+
+預期答：
+
+黑色。
+
+問 3：
+
+我之前說我的車是什麼顏色？
+
+理想預期答：
+
+白色。
+
+第三問屬 optional predecessor-language read；安全不支援可接受，但 predecessor 結構不能丟失。
+
+#9 — 匿名讀書會四人 OPTIONAL
+
+問 1：
+
+我的讀書會有四位成員。
+
+注意：沒有提供四個人的名字。
+
+若成功，預期答：
+
+已記住讀書會有 4 位成員。
+
+問 2：
+
+讀書會有幾個人？
+
+預期答：
+
+4 位。
+
+❌ Tiger 不可以自己發明四個人的姓名。
+
+#10 — 匿名成員退出：不能亂猜 DEFERRED + HARD SAFETY
+
+前置：如果 #9 成功，讀書會 count = 4，但不知道具體四個人是誰。
+
+問 1：
+
+其中一個讀書會成員退出了。
+
+預期答：
+
+需要更多資訊／請說明是哪一位成員。
+
+或 typed non-execution。
+
+絕對不能：
+
+好，已刪除某一位。
+
+因為沒有可識別 target。
+
+Canonical mutation 必須是：
+
+0
+
+接著不回答它的 clarification，而是直接問另一題：
+
+問 2：
+
+讀書會有幾個人？
+
+如果 #9 已成功：
+
+預期答：
+
+4 位。
+
+不是 3。
+
+而且前面的 pending 不可以污染這一問。
+
+#11 — 寵物名字 HARD
+
+問 1：
+
+我的寵物名字叫 Mochi。
+
+預期答：
+
+已記住。
+
+問 2：
+
+我的寵物叫什麼名字？
+
+預期答：
+
+Mochi。
+
+同時驗證 #10 的 pending/ambiguity 沒有污染新的 scalar 記憶。
+
+#12 — 不知道室友位置 + 飲料 scalar HARD
+
+問 1：
+
+我的大學室友現在住哪裡？
+
+系統沒有這筆資料。
+
+預期答：
+
+我不知道／找不到相關記憶。
+
+也可以 typed abstention / TARGET_NOT_FOUND。
+
+❌ 不准猜地點。
+
+接著：
+
+問 2：
+
+我的最愛飲料是咖啡。
+
+預期答：
+
+已記住。
+
+問 3：
+
+我最愛的飲料是什麼？
+
+預期答：
+
+咖啡。
+
+第一問的 unknown target 不能污染後面的飲料 slot。
+
+#13 — 模糊刪除 + 生日 scalar HARD
+
+問 1：
+
+把我某一個研究小組成員移除。
+
+因為沒有指定哪一位：
+
+預期答：
+
+請問要移除哪一位成員？
+
+或 typed non-execution。
+
+Canonical mutation：
+
+0
+
+不能自己刪 Alice / Bob / Carol 任一人。
+
+然後不回答 clarification，直接進下一個獨立 scalar：
+
+問 2：
+
+我的生日月份是五月。
+
+預期答：
+
+已記住。
+
+問 3：
+
+我的生日月份是幾月？
+
+預期答：
+
+五月。
+
+這題驗證 stale pending 不會吃掉下一個正常 Memory request。
+
+#14 — 真正 clarification continuation OPTIONAL + HARD pending safety
+
+問 1：
+
+專案 Alpha 有 Eva、Frank。
+
+若 automation 成功：
+
+預期答：
+
+已記住 Alpha 有 Eva 和 Frank。
+
+接著：
+
+問 2：
+
+移除其中一個成員。
+
+因為 Eva / Frank 都可能：
+
+預期答：
+
+請問你是指 Eva 還是 Frank？
+
+此時不能 mutation。
+
+問 3：
+
+我是指 Eva。
+
+這是正式 continuation。
+
+如果需要 destructive confirmation，接著：
+
+系統：
+
+請確認執行。
+
+問 3A：
+
+確認執行。
+
+若成功：
+
+Eva → inactive/retracted
+Frank → active
+pending → consumed
+
+最後：
+
+問 4：
+
+專案 Alpha 現在有哪些成員？
+
+預期答：
+
+Frank。
+
+如果 composition automation 本身 safe-degrade，也可以不完成 collection mutation；但pending integrity 是 HARD。
+
+#15 — clarification 後的新 scalar 不得被污染 HARD
+
+問 1：
+
+我的書桌在二樓。
+
+預期答：
+
+已記住。
+
+問 2：
+
+我的書桌在哪一層樓？
+
+預期答：
+
+二樓。
+
+關鍵是 #14 的 pending 不得被重新啟用或錯套到書桌。
+
+#16 — 球隊 + 手機 + 樂團隔離 MIXED
+球隊部分 OPTIONAL
+
+問 1：
+
+球隊有 Tom、Jerry、Sam。
+
+若成功：
+
+已記住。
+
+問 2：
+
+球隊現在有幾位成員？
+
+預期答：
+
+3 位。
+
+手機部分 HARD
+
+問 3：
+
+我的手機是 Pixel。
+
+預期答：
+
+已記住。
+
+問 4：
+
+我的手機是什麼型號？
+
+預期答：
+
+Pixel。
+
+這兩個是 HARD，不能 safe degrade。
+
+樂團部分 OPTIONAL
+
+問 5：
+
+樂團有 May、June。
+
+若成功：
+
+已記住。
+
+問 6：
+
+樂團現在有幾位成員？
+
+預期答：
+
+2 位。
+
+球隊、手機、樂團三個責任不能互相污染。
+
+#17 — Tom 退出球隊 + History + 登山隊 OPTIONAL
+
+前置若 #16 球隊 automation 成功：
+
+Tom、Jerry、Sam
+
+問 1：
+
+Tom 退出球隊。
+
+若需要 confirmation：
+
+問 1A：
+
+確認執行。
+
+成功後球隊 current：
+
+Jerry、Sam
+
+問 2：
+
+球隊現在有哪些成員？
+
+預期答：
+
+Jerry、Sam。
+
+問 3：
+
+Tom 之前是球隊成員嗎？
+
+理想預期答：
+
+是。
+
+這個 broad historical lookup 是 optional。
+
+再建立另一個 collection：
+
+問 4：
+
+我的登山隊有 Ian、Leo。
+
+若成功：
+
+已記住。
+
+登山隊應為：
+
+Ian、Leo
+
+#18 — 同一個 Leo 在兩個 collection，不能 cross-retract OPTIONAL
+
+前置如果 #17 登山隊成功：
+
+登山隊 = Ian、Leo
+
+問 1：
+
+攝影社有 Leo、Nina。
+
+若成功：
+
+已記住。
+
+此時：
+
+登山隊：Ian、Leo
+攝影社：Leo、Nina
+
+問 2：
+
+登山隊現在有哪些成員？
+
+預期答：
+
+Ian、Leo。
+
+問 3：
+
+攝影社現在有哪些成員？
+
+預期答：
+
+Leo、Nina。
+
+接著：
+
+問 4：
+
+Leo 退出攝影社。
+
+若需要 confirmation：
+
+問 4A：
+
+確認執行。
+
+成功後：
+
+攝影社：Nina
+登山隊：仍然 Ian、Leo
+
+再確認一次：
+
+問 5：
+
+登山隊現在有哪些成員？
+
+預期答：
+
+Ian、Leo。
+
+問 6：
+
+攝影社現在有哪些成員？
+
+預期答：
+
+Nina。
+
+這題最核心就是：
+
+Leo 退出攝影社，不能把 Leo 從登山隊一起移除。
+
+#19 — 三個 scalar slot 重複 assertion HARD
+
+前面應已經有：
+
+辦公室 = 新竹
+車色 = 黑色
+最愛飲料 = 咖啡
+
+現在再說一次：
+
+問 1：
+
+我的辦公室在新竹。
+
+預期答：
+
+已記住／狀態維持新竹。
+
+不能創造 duplicate active slot。
+
+問 2：
+
+我的車是黑色的。
+
+預期答：
+
+已記住／狀態維持黑色。
+
+問 3：
+
+我的最愛飲料是咖啡。
+
+預期答：
+
+已記住／狀態維持咖啡。
+
+然後讀：
+
+問 4：
+
+我的辦公室在哪裡？
+
+答：
+
+新竹。
+
+問 5：
+
+我的車是什麼顏色？
+
+答：
+
+黑色。
+
+問 6：
+
+我最愛的飲料是什麼？
+
+答：
+
+咖啡。
+
+並且原先 predecessor history 不能被 reassertion 搞壞。
+
+#20 — 最終長 session 總驗收 HARD + OPTIONAL
+
+這一題是在同一 session 累積做完 #1～#19 後，逐項重新讀。
+
+問 1 — HARD
+
+我的辦公室在哪裡？
+
+預期答：
+
+新竹。
+
+問 2 — OPTIONAL predecessor
+
+我之前說我的辦公室在哪裡？
+
+理想預期答：
+
+台北。
+
+如果 predecessor natural-language automation safe-degrade，可接受。
+
+問 3 — OPTIONAL
+
+研究小組現在有哪些成員？
+
+如果 #3/#5/#6 automation 都成功：
+
+預期答：
+
+Alice、Bob、Carol。
+
+若這條 optional state earlier safe-degraded，這裡必須安全 abstain/degrade，不能發明狀態。
+
+問 4 — OPTIONAL
+
+實驗室現在有哪些成員？
+
+若 admitted：
+
+預期答：
+
+Bob、David。
+
+問 5 — OPTIONAL
+
+讀書會有幾個人？
+
+若 #9 admitted：
+
+預期答：
+
+4 位。
+
+因為 #10 的「其中一個退出」沒有合法 target，所以不能變成 3。
+
+問 6 — HARD
+
+我的寵物叫什麼名字？
+
+預期答：
+
+Mochi。
+
+問 7 — HARD
+
+我的生日月份是幾月？
+
+預期答：
+
+五月。
+
+問 8 — OPTIONAL
+
+登山隊現在有哪些成員？
+
+若 #17 admitted：
+
+預期答：
+
+Ian、Leo。
+
+問 9 — OPTIONAL
+
+攝影社現在有哪些成員？
+
+若 #18 lifecycle admitted：
+
+預期答：
+
+Nina。
+
+因為 Leo 只退出攝影社，但仍留在登山隊。
+
+整個 #20 的所有 read：
+
+Canonical mutation 必須全部 = 0
+
+我對這 20 題的看法
+
+現在這個版本已經很接近你想要的「人工看得懂的驗收題庫」。
+
+你可以把它理解成三大類：
+
+HARD：#1、#2、#7、#8、#11、#12、#13、#15、#16 的 phone component、#19、#20 的 hard components。這些該成功就必須成功。
+OPTIONAL：collection / membership / aggregate / broad-history automation。做得到可以成功；做不到可以安全降級，但不能亂寫 Memory。
+HARD SAFETY：即使整題是 Optional，像 #3/#4/#5/#6/#9/#14/#17/#18 的 isolation、ambiguity、pending safety 仍然是硬要求。
+
+另外，這份檔案的 canonical proposal SHA 是：
+
+1f23d4645c9f5cd6ffeaf95a64d964a15d36db8d1286b92f05418f784b3f11f8
+
+狀態仍是：
+
+PROPOSED_USER_APPROVAL_REQUIRED
+
+所以你現在正是在做最合理的事：先人工看題目與預期答案，再決定是否批准。
