@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Structured Memory V2</title>
+  <style>
+    body { font: 16px system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #20242a; }
+    h1 { margin-bottom: .3rem; } p { color: #515961; }
+    section { border: 1px solid #cbd1d7; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    label { display: block; margin: .55rem 0; }
+    input, select, button { font: inherit; padding: .35rem .5rem; }
+    input { max-width: 100%; box-sizing: border-box; }
+    button { margin: .3rem .3rem .3rem 0; cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .5; }
+    table { width: 100%; border-collapse: collapse; overflow-wrap: anywhere; }
+    th, td { padding: .4rem; border-bottom: 1px solid #e0e4e7; text-align: left; }
+    tr.selected { background: #e4f1ff; }
+    code, pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+    #status { min-height: 1.6rem; font-weight: 600; }
+    #pending { border-color: #b67819; background: #fff9e7; }
+    .small { font-size: .88rem; color: #515961; }
+  </style>
+</head>
+<body>
+  <h1>Structured Memory V2</h1>
+  <p>Explicit structured scalar and collection operations. Changes require a preview and Confirm; no language model is used.</p>
+  <label>User: <select id="user"><option value="user1">user1</option><option value="user2">user2</option></select></label>
+  <div id="status" role="status" aria-live="polite"></div>
+
+  <section>
+    <h2>Existing scalar memories</h2>
+    <button id="refresh" type="button">Refresh</button>
+    <table><thead><tr><th>Select</th><th>memory_id</th><th>entity_id</th><th>semantic_key</th><th>Current</th></tr></thead>
+      <tbody id="memories"></tbody></table>
+  </section>
+
+  <section>
+    <h2>Selected memory</h2>
+    <div id="selected">None selected</div>
+    <button id="read-current" type="button" disabled>Read Current</button>
+    <button id="read-previous" type="button" disabled>Read Previous</button>
+    <div id="read-result" aria-live="polite"></div>
+    <label>New value: <input id="update-value" type="text" autocomplete="off"></label>
+    <button id="prepare-update" type="button" disabled>Prepare Update</button>
+  </section>
+
+  <section>
+    <h2>Create new scalar</h2>
+    <label>Entity ID: <input id="entity-id" type="text" autocomplete="off"></label>
+    <label>Semantic key: <input id="semantic-key" type="text" autocomplete="off"></label>
+    <label>Value: <input id="create-value" type="text" autocomplete="off"></label>
+    <button id="prepare-create" type="button">Prepare Create</button>
+  </section>
+
+  <section>
+    <h2>Collections</h2>
+    <button id="refresh-collections" type="button">Refresh collections</button>
+    <table><thead><tr><th>Select</th><th>collection_id</th><th>Label</th><th>Semantic key</th><th>Mode</th><th>Count</th></tr></thead>
+      <tbody id="collections"></tbody></table>
+  </section>
+
+  <section>
+    <h2>Selected collection</h2>
+    <div id="selected-collection">None selected</div>
+    <button id="read-members" type="button" disabled>List Members</button>
+    <button id="count-members" type="button" disabled>Count Members</button>
+    <button id="read-declared" type="button" disabled>Read Declared Count</button>
+    <div id="collection-read-result" aria-live="polite"></div>
+    <h3>Current members</h3>
+    <table><thead><tr><th>Member ID</th><th>Member Label</th><th>Action</th></tr></thead>
+      <tbody id="members"></tbody></table>
+    <label>Member ID: <input id="member-id" type="text" autocomplete="off"></label>
+    <label>Member Label: <input id="member-label" type="text" autocomplete="off"></label>
+    <button id="prepare-add" type="button" disabled>Prepare Add</button>
+    <button id="prepare-readd" type="button" disabled>Prepare Re-add</button>
+  </section>
+
+  <section>
+    <h2>Create collection</h2>
+    <label>Entity ID: <input id="collection-entity" type="text" autocomplete="off"></label>
+    <label>Collection Label: <input id="collection-label" type="text" autocomplete="off"></label>
+    <label>Semantic Key / Type: <input id="collection-key" type="text" autocomplete="off"></label>
+    <label>Membership Mode: <select id="collection-mode"><option value="NAMED">NAMED</option><option value="COUNT_ONLY">COUNT_ONLY</option></select></label>
+    <label id="declared-count-wrap" hidden>Declared Count: <input id="declared-count" type="number" min="0" max="1000000000" step="1"></label>
+    <button id="prepare-collection-create" type="button">Prepare Create Collection</button>
+  </section>
+
+  <section id="pending" hidden>
+    <h2>Pending operation — confirmation required</h2>
+    <pre id="preview"></pre>
+    <button id="confirm" type="button">Confirm</button>
+    <button id="cancel" type="button">Cancel</button>
+  </section>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    let memories = [];
+    let selectedId = null;
+    let pending = null;
+    let pendingKind = null;
+    let collections = [];
+    let selectedCollectionId = null;
+    let collectionDetail = null;
+    let busy = false;
+
+    function currentUser() { return $('user').value; }
+    function status(text) { $('status').textContent = text; }
+    function selectedMemory() { return memories.find(item => item.memory_id === selectedId) || null; }
+    function controls() {
+      const active = !!selectedMemory();
+      const selectedCollection = !!collectionDetail;
+      const namedCollection = selectedCollection && collectionDetail.membership_mode === 'NAMED';
+      $('user').disabled = busy || !!pending;
+      $('refresh').disabled = busy || !!pending;
+      $('read-current').disabled = busy || !!pending || !active;
+      $('read-previous').disabled = busy || !!pending || !active;
+      $('prepare-update').disabled = busy || !!pending || !active;
+      $('prepare-create').disabled = busy || !!pending;
+      $('refresh-collections').disabled = busy || !!pending;
+      $('prepare-collection-create').disabled = busy || !!pending;
+      $('read-members').disabled = busy || !!pending || !namedCollection;
+      $('count-members').disabled = busy || !!pending || !namedCollection;
+      $('read-declared').disabled = busy || !!pending || !selectedCollection || namedCollection;
+      $('prepare-add').disabled = busy || !!pending || !namedCollection;
+      $('prepare-readd').disabled = busy || !!pending || !namedCollection;
+      for (const button of $('collections').querySelectorAll('button')) button.disabled = busy || !!pending;
+      for (const button of $('members').querySelectorAll('button')) button.disabled = busy || !!pending;
+      for (const button of $('memories').querySelectorAll('button')) button.disabled = busy || !!pending;
+      $('confirm').disabled = busy || !pending;
+      $('cancel').disabled = busy || !pending;
+      $('pending').hidden = !pending;
+    }
+    async function request(path, data) {
+      const options = data === undefined ? {} : {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+      };
+      const response = await fetch(path, options);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.reason || 'Invalid request');
+      return result;
+    }
+    async function run(action) {
+      if (busy) return;
+      busy = true; controls();
+      try { await action(); }
+      catch (error) {
+        if (pending && ['STALE_CONFIRMATION', 'CONFIRMATION_NOT_FOUND'].includes(error.message)) {
+          pending = null; pendingKind = null;
+          await refresh();
+        }
+        status('Invalid request: ' + error.message);
+      }
+      finally { busy = false; controls(); }
+    }
+    function render() {
+      const tbody = $('memories'); tbody.replaceChildren();
+      for (const item of memories) {
+        const row = document.createElement('tr');
+        if (item.memory_id === selectedId) row.className = 'selected';
+        const button = document.createElement('button');
+        button.type = 'button'; button.textContent = 'Select';
+        button.disabled = !!pending;
+        button.addEventListener('click', () => {
+          selectedId = item.memory_id; $('read-result').textContent = '';
+          $('update-value').value = ''; render();
+        });
+        const buttonCell = document.createElement('td'); buttonCell.append(button); row.append(buttonCell);
+        for (const value of [item.memory_id, item.entity_id, item.semantic_key, item.current_value]) {
+          const cell = document.createElement('td'); cell.textContent = value ?? ''; row.append(cell);
+        }
+        tbody.append(row);
+      }
+      const item = selectedMemory();
+      $('selected').textContent = item ?
+        `memory_id: ${item.memory_id} | entity_id: ${item.entity_id} | semantic_key: ${item.semantic_key} | Current: ${item.current_value}` :
+        'None selected';
+      controls();
+    }
+    async function refresh() {
+      const result = await request('/api/memories?user_id=' + encodeURIComponent(currentUser()));
+      memories = result.memories;
+      if (!selectedMemory()) selectedId = null;
+      render();
+      await refreshCollections();
+    }
+    function showPreview(result) {
+      if (result.status === 'NO_OP') { status('No change / already current'); return; }
+      pending = result.preview;
+      pendingKind = 'scalar';
+      $('preview').textContent =
+        `Operation: ${pending.operation}\nTarget memory: ${pending.memory_id ?? '(new)'}\n` +
+        `Entity ID: ${pending.entity_id}\nSemantic key: ${pending.semantic_key}\n` +
+        `Old value: ${pending.old_value ?? '(none)'}\nNew value: ${pending.new_value}`;
+      status('Confirmation required — canonical memory unchanged');
+      controls();
+    }
+    function renderCollections() {
+      const tbody = $('collections'); tbody.replaceChildren();
+      for (const item of collections) {
+        const row = document.createElement('tr');
+        if (item.collection_id === selectedCollectionId) row.className = 'selected';
+        const select = document.createElement('button');
+        select.type = 'button'; select.textContent = 'Select'; select.disabled = busy || !!pending;
+        select.addEventListener('click', () => run(async () => {
+          selectedCollectionId = item.collection_id;
+          $('collection-read-result').textContent = '';
+          await loadCollection();
+          renderCollections();
+        }));
+        const selectCell = document.createElement('td'); selectCell.append(select); row.append(selectCell);
+        for (const value of [item.collection_id, item.display_label, item.semantic_key,
+                             item.membership_mode, item.count]) {
+          const cell = document.createElement('td'); cell.textContent = value ?? ''; row.append(cell);
+        }
+        tbody.append(row);
+      }
+      $('selected-collection').textContent = collectionDetail ?
+        `collection_id: ${collectionDetail.collection_id} | label: ${collectionDetail.display_label} | type: ${collectionDetail.semantic_key} | mode: ${collectionDetail.membership_mode} | count: ${collectionDetail.count}` :
+        'None selected';
+      const members = $('members'); members.replaceChildren();
+      for (const member of collectionDetail?.members || []) {
+        const row = document.createElement('tr');
+        for (const value of [member.member_id, member.member_label]) {
+          const cell = document.createElement('td'); cell.textContent = value; row.append(cell);
+        }
+        const action = document.createElement('td');
+        const remove = document.createElement('button');
+        remove.type = 'button'; remove.textContent = 'Prepare Remove';
+        remove.disabled = busy || !!pending;
+        remove.addEventListener('click', () => run(async () => {
+          const result = await request('/api/collections/prepare', {
+            operation: 'REMOVE_MEMBER', user_id: currentUser(),
+            collection_id: selectedCollectionId, member_id: member.member_id
+          });
+          showCollectionPreview(result);
+        }));
+        action.append(remove); row.append(action); members.append(row);
+      }
+      controls();
+    }
+    async function loadCollection() {
+      collectionDetail = selectedCollectionId ?
+        await request('/api/collection?user_id=' + encodeURIComponent(currentUser()) +
+                      '&collection_id=' + encodeURIComponent(selectedCollectionId)) : null;
+    }
+    async function refreshCollections() {
+      const result = await request('/api/collections?user_id=' + encodeURIComponent(currentUser()));
+      collections = result.collections;
+      if (!collections.some(item => item.collection_id === selectedCollectionId)) selectedCollectionId = null;
+      await loadCollection(); renderCollections();
+    }
+    function showCollectionPreview(result) {
+      if (result.status === 'NO_OP') { status('No change / member already active'); return; }
+      pending = result.preview; pendingKind = 'collection';
+      $('preview').textContent =
+        `Operation: ${pending.operation}\nCollection ID: ${pending.collection_id}\n` +
+        `Label: ${pending.display_label}\nEntity ID: ${pending.entity_id}\n` +
+        `Semantic key: ${pending.semantic_key}\nMode: ${pending.membership_mode}\n` +
+        `Member ID: ${pending.member_id ?? '(none)'}\nMember label: ${pending.member_label ?? '(none)'}\n` +
+        `Declared count: ${pending.declared_count ?? '(derived)'}\n` +
+        `Before: ${JSON.stringify(pending.before)}\nAfter: ${JSON.stringify(pending.after)}`;
+      status('Confirmation required — collection unchanged'); controls();
+    }
+    $('user').addEventListener('change', () => run(async () => {
+      selectedId = null; $('read-result').textContent = '';
+      selectedCollectionId = null; collectionDetail = null; $('collection-read-result').textContent = '';
+      $('update-value').value = ''; await refresh();
+    }));
+    $('refresh').addEventListener('click', () => run(refresh));
+    $('refresh-collections').addEventListener('click', () => run(refreshCollections));
+    $('collection-mode').addEventListener('change', () => {
+      $('declared-count-wrap').hidden = $('collection-mode').value !== 'COUNT_ONLY';
+    });
+    $('prepare-collection-create').addEventListener('click', () => run(async () => {
+      const mode = $('collection-mode').value;
+      const countText = $('declared-count').value;
+      const result = await request('/api/collections/prepare', {
+        operation: 'CREATE_COLLECTION', user_id: currentUser(),
+        entity_id: $('collection-entity').value, semantic_key: $('collection-key').value,
+        display_label: $('collection-label').value, membership_mode: mode,
+        declared_count: mode === 'COUNT_ONLY' && countText !== '' ? Number(countText) : null
+      });
+      showCollectionPreview(result);
+    }));
+    for (const [buttonId, operation] of [['prepare-add','ADD_MEMBER'],['prepare-readd','READD_MEMBER']]) {
+      $(buttonId).addEventListener('click', () => run(async () => {
+        if (!collectionDetail) return;
+        const result = await request('/api/collections/prepare', {
+          operation, user_id: currentUser(), collection_id: selectedCollectionId,
+          member_id: $('member-id').value, member_label: $('member-label').value
+        });
+        showCollectionPreview(result);
+      }));
+    }
+    for (const [buttonId, operation] of [['read-members','LIST_MEMBERS'],
+                                        ['count-members','COUNT_MEMBERS'],
+                                        ['read-declared','READ_DECLARED_COUNT']]) {
+      $(buttonId).addEventListener('click', () => run(async () => {
+        if (!collectionDetail) return;
+        const result = await request('/api/collections/read', {
+          operation, user_id: currentUser(), collection_id: selectedCollectionId
+        });
+        $('collection-read-result').textContent = operation === 'LIST_MEMBERS' ?
+          'Members: ' + result.members.map(item => item.member_label).join(', ') :
+          operation === 'COUNT_MEMBERS' ? `Count: ${result.count}` :
+          `Known count: ${result.count}; member identities: unknown`;
+        status('Collection read complete — no mutation');
+      }));
+    }
+    $('prepare-create').addEventListener('click', () => run(async () => {
+      const result = await request('/api/prepare', {operation: 'CREATE_SCALAR', user_id: currentUser(),
+        entity_id: $('entity-id').value, semantic_key: $('semantic-key').value,
+        value: $('create-value').value});
+      showPreview(result);
+    }));
+    $('prepare-update').addEventListener('click', () => run(async () => {
+      const item = selectedMemory(); if (!item) return;
+      const result = await request('/api/prepare', {operation: 'UPDATE_SCALAR', user_id: currentUser(),
+        memory_id: item.memory_id, value: $('update-value').value});
+      showPreview(result);
+    }));
+    for (const [buttonId, operation] of [['read-current','READ_CURRENT'], ['read-previous','READ_PREVIOUS']]) {
+      $(buttonId).addEventListener('click', () => run(async () => {
+        const item = selectedMemory(); if (!item) return;
+        const result = await request('/api/read', {user_id: currentUser(),
+          memory_id: item.memory_id, operation});
+        $('read-result').textContent = result.status === 'NO_PREVIOUS' ?
+          'No previous value' : `${operation === 'READ_CURRENT' ? 'Current' : 'Previous'} value: ${result.value}`;
+        status('Read complete — no mutation');
+      }));
+    }
+    $('confirm').addEventListener('click', () => run(async () => {
+      if (!pending) return;
+      const isCollection = pendingKind === 'collection';
+      let result;
+      try {
+        result = await request(isCollection ? '/api/collections/confirm' : '/api/confirm',
+                               {user_id: currentUser(), token: pending.token});
+      } catch (error) {
+        if (isCollection) {
+          pending = null; pendingKind = null;
+          await refresh();
+        }
+        throw error;
+      }
+      pending = null; selectedId = result.memory_id;
+      pendingKind = null;
+      if (isCollection) { selectedCollectionId = result.collection_id; selectedId = null; }
+      $('read-result').textContent = '';
+      $('collection-read-result').textContent = '';
+      $('update-value').value = '';
+      await refresh();
+      status(result.status === 'CREATED' ? 'Created' : 'Updated');
+    }));
+    $('cancel').addEventListener('click', () => run(async () => {
+      if (!pending) return;
+      await request(pendingKind === 'collection' ? '/api/collections/cancel' : '/api/cancel',
+                    {user_id: currentUser(), token: pending.token});
+      pending = null; pendingKind = null; status('Cancelled — no change');
+    }));
+    run(refresh);
+  </script>
+</body>
+</html>

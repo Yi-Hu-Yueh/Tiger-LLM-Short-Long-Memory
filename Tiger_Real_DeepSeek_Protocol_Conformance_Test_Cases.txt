@@ -1,0 +1,457 @@
+Tiger Short/Long Memory
+Real DeepSeek Protocol Conformance Test Cases
+版本：v1
+用途：專門測試 DeepSeek → Semantic IR / vNext Protocol 邊界，不取代既有 #1～#20 產品人工驗收。
+
+============================================================
+使用規則
+============================================================
+
+1. 建議使用全新測試 DB。
+2. 每個案例先看「測試類型」與「前置狀態」。
+3. 每一個「問題」下面都直接列出「預期答案」。
+4. 除了答案，也要檢查「預期 Memory / 行為」。
+5. 若出現 schema error、502、錯誤 mutation、錯誤 target、錯誤 proposal，該案例即 FAIL。
+6. OPTIONAL 代表功能可以安全降級，但 HARD SAFETY 仍不可違反。
+7. 不要為了通過案例而手動改 DB。
+8. 若使用 TIGER_DEBUG_TYPED_PROTOCOL=1，請同時保留 console diagnostic 供失敗分析。
+
+============================================================
+類型 A — Scalar（單值記憶）
+============================================================
+
+------------------------------------------------------------
+Case P01 — Scalar CREATE
+測試類型：Scalar / CREATE
+驗收等級：HARD
+前置狀態：無「辦公室位置」記憶
+------------------------------------------------------------
+
+問題：
+我的辦公室在台北。
+
+預期答案：
+已記住／記憶已更新。
+（字面不限，但不可要求不必要的澄清）
+
+預期 Memory / 行為：
+- 建立一筆 Scalar Current Memory
+- 值 = 台北
+- 不可建立 Proposal
+- 不可建立 Clarification
+- revision +1
+
+
+------------------------------------------------------------
+Case P02 — Scalar READ
+測試類型：Scalar / READ
+驗收等級：HARD
+前置狀態：辦公室 = 台北
+------------------------------------------------------------
+
+問題：
+我的辦公室在哪裡？
+
+預期答案：
+台北。
+
+預期 Memory / 行為：
+- 只讀
+- Current Memory 不變
+- History 不變
+- revision 不變
+- 不可產生 Proposal / Clarification
+
+
+------------------------------------------------------------
+Case P03 — Scalar REPLACE
+測試類型：Scalar / SET_VALUE
+驗收等級：HARD
+前置狀態：辦公室 = 台北
+------------------------------------------------------------
+
+問題：
+更正，我的辦公室其實在新竹。
+
+預期答案：
+已更新／已更正為新竹。
+
+預期 Memory / 行為：
+- 同一個 stable memory_id
+- Current = 新竹
+- predecessor = 台北
+- revision +1
+- 不可建立新的 duplicate slot
+
+
+------------------------------------------------------------
+Case P04 — Scalar REASSERT / NOOP
+測試類型：Scalar / REASSERT_NOOP
+驗收等級：HARD
+前置狀態：辦公室 = 新竹
+------------------------------------------------------------
+
+問題：
+我的辦公室在新竹。
+
+預期答案：
+已記住／目前仍是新竹。
+（字面不限，但不可報錯）
+
+預期 Memory / 行為：
+- 不建立 duplicate Current Memory
+- 不新增 predecessor
+- revision 不變
+- 不可把同值 assertion 當成新的 replacement
+
+
+============================================================
+類型 B — Set（具名集合 / membership）
+============================================================
+
+------------------------------------------------------------
+Case P05 — Set CREATE
+測試類型：Set / CREATE_SET
+驗收等級：OPTIONAL + HARD SAFETY
+前置狀態：無研究小組記憶
+------------------------------------------------------------
+
+問題：
+我的研究小組有三位成員：Alice、Bob、Carol。
+
+預期答案：
+已記住研究小組成員。
+（若產品安全降級，必須明確 non-execution；不可假裝成功）
+
+預期 Memory / 行為：
+- 若成功：Set = [Alice, Bob, Carol]
+- 不可發明第四位成員
+- 不可把它存成 Count-only
+- revision +1（若成功）
+
+
+------------------------------------------------------------
+Case P06 — Set ADD_ITEM
+測試類型：Set / ADD_ITEM
+驗收等級：OPTIONAL + HARD SAFETY
+前置狀態：研究小組 = [Alice, Carol]
+------------------------------------------------------------
+
+問題：
+Bob 又加入研究小組了。
+
+預期答案：
+已重新加入／已更新。
+
+預期 Memory / 行為：
+- Current = [Alice, Carol, Bob] 或等價順序
+- Bob 只能有一個 active membership
+- 同一個 stable memory_id
+- revision +1
+
+
+------------------------------------------------------------
+Case P07 — Set REMOVE_ITEM / Proposal
+測試類型：Set / REMOVE_ITEM / Destructive Proposal
+驗收等級：OPTIONAL + HARD SAFETY
+前置狀態：
+- 研究小組 = [Alice, Bob, Carol]
+- 實驗室 = [Bob, David]
+------------------------------------------------------------
+
+問題：
+Bob 退出研究小組了。
+
+預期答案：
+請確認是否執行／已建立待確認操作。
+（不可直接刪除）
+
+預期 Memory / 行為：
+- 建立 Pending Proposal
+- Current Memory 此時仍維持研究小組 [Alice, Bob, Carol]
+- 實驗室仍是 [Bob, David]
+- revision 不變
+
+接續問題：
+確認執行。
+
+預期答案：
+已執行／記憶已更新。
+
+預期 Memory / 行為：
+- 研究小組 = [Alice, Carol]
+- 實驗室 = [Bob, David]
+- predecessor 保存 [Alice, Bob, Carol]
+- Confirm 不可再呼叫 DeepSeek
+- revision +1
+
+
+============================================================
+類型 C — Count（只有數量，沒有具名成員）
+============================================================
+
+------------------------------------------------------------
+Case P08 — Count CREATE
+測試類型：Count / CREATE_COUNT
+驗收等級：OPTIONAL + HARD SAFETY
+前置狀態：無讀書會人數記憶
+------------------------------------------------------------
+
+問題：
+我的讀書會有四位成員。
+
+預期答案：
+已記住讀書會有 4 位成員。
+（若安全降級，必須明確 non-execution）
+
+預期 Memory / 行為：
+- 若成功：Count = 4
+- 不可建立四個假成員
+- 不可建立 member1/member2 等 placeholder
+- 不可存成 fabricated Set
+
+
+------------------------------------------------------------
+Case P09 — Anonymous Count Event
+測試類型：Count / Ambiguous Delta / Non-execution
+驗收等級：HARD SAFETY
+前置狀態：讀書會人數 = 4；不知道四個人的身分
+------------------------------------------------------------
+
+問題：
+其中一個讀書會成員退出了。
+
+預期答案：
+需要更多資訊／請說明是哪一位成員。
+或其他明確 non-execution 回覆。
+
+預期 Memory / 行為：
+- 不可自動 4 → 3
+- 不可 REMOVE_ITEM
+- 不可建立 executable Proposal
+- revision 不變
+
+接續問題：
+讀書會有幾個人？
+
+預期答案：
+4 位。
+
+預期 Memory / 行為：
+- 仍為 4
+- 前一個 ambiguous turn 不可污染這次 READ
+
+
+============================================================
+類型 D — Record（結構化欄位）
+============================================================
+
+------------------------------------------------------------
+Case P10 — Record SET_FIELD
+測試類型：Record / SET_FIELD
+驗收等級：HARD
+前置狀態：可無 owner record，或 owner 已存在其他欄位
+------------------------------------------------------------
+
+問題：
+所有權人的地址是台中。
+
+預期答案：
+已記住／已更新地址為台中。
+
+預期 Memory / 行為：
+- owner.address = 台中
+- 若 owner 還有其他欄位，不可被覆蓋
+- 不可 DELETE 整筆 Record
+- revision +1（若 Current state 改變）
+
+
+------------------------------------------------------------
+Case P11 — Record DELETE_FIELD / Proposal
+測試類型：Record / DELETE_FIELD / Destructive Proposal
+驗收等級：HARD SAFETY
+前置狀態：
+owner = {
+  name: Alice,
+  address: 台中
+}
+------------------------------------------------------------
+
+問題：
+忘記所有權人的地址。
+
+預期答案：
+請確認是否刪除地址欄位／已建立待確認操作。
+
+預期 Memory / 行為：
+- 建立 Pending Proposal
+- 此時 owner.address 仍是台中
+- owner.name 仍是 Alice
+- revision 不變
+
+接續問題：
+確認執行。
+
+預期答案：
+已執行／已刪除地址記憶。
+
+預期 Memory / 行為：
+- owner = {name: Alice}
+- 不可 DELETE 整個 owner record
+- predecessor 保存原 record
+- Confirm 不可再呼叫 DeepSeek
+- revision +1
+
+
+============================================================
+類型 E — Unknown / Ambiguity / Clarification
+============================================================
+
+------------------------------------------------------------
+Case P12 — Unknown Personal Memory
+測試類型：READ / UNKNOWN
+驗收等級：HARD
+前置狀態：沒有室友位置記憶
+------------------------------------------------------------
+
+問題：
+我的大學室友現在住哪裡？
+
+預期答案：
+我不知道／目前沒有相關記憶／找不到相關記憶。
+
+預期 Memory / 行為：
+- 不可猜地點
+- 不可建立新 Memory
+- 不可建立 Proposal
+- revision 不變
+
+
+------------------------------------------------------------
+Case P13 — Ambiguous Destructive Mutation
+測試類型：CLARIFY / Ambiguous Set Mutation
+驗收等級：HARD SAFETY
+前置狀態：研究小組 = [Alice, Bob, Carol]
+------------------------------------------------------------
+
+問題：
+移除其中一個研究小組成員。
+
+預期答案：
+請問要移除哪一位成員？
+
+預期 Memory / 行為：
+- canonical mutation = 0
+- 不可猜 Alice / Bob / Carol
+- 不可先建立 executable Proposal
+- revision 不變
+
+
+============================================================
+類型 F — History / Cross-session Read
+============================================================
+
+------------------------------------------------------------
+Case P14 — Historical READ
+測試類型：History / READ_PREDECESSOR
+驗收等級：OPTIONAL + HARD underlying lineage
+前置狀態：
+- 辦公室曾經 = 台北
+- Current 辦公室 = 新竹
+------------------------------------------------------------
+
+問題：
+我之前說我的辦公室在哪裡？
+
+預期答案：
+理想答案：台北。
+若 broad predecessor natural-language read 尚未安全支援：
+允許明確 safe degradation，但不可把 Current 新竹誤當 predecessor。
+
+預期 Memory / 行為：
+- 不得修改 Current
+- 不得新增 History
+- revision 不變
+- predecessor continuity 必須仍存在
+
+
+============================================================
+類型 G — Non-memory / Freeform
+============================================================
+
+------------------------------------------------------------
+Case P15 — Non-memory FREEFORM
+測試類型：FREEFORM / Non-memory turn
+驗收等級：HARD SAFETY
+前置狀態：任意
+------------------------------------------------------------
+
+問題：
+請用一句話解釋什麼是 LangGraph。
+
+預期答案：
+LangGraph 是用圖狀工作流程來編排具狀態 AI agent / workflow 的框架。
+（語意正確即可，不要求固定字面）
+
+預期 Memory / 行為：
+- 不可建立個人 Long-term Memory
+- 不可修改既有 Memory
+- 不可建立 Proposal
+- 不可建立 Clarification
+- revision 不變
+
+
+============================================================
+測試類型總表
+============================================================
+
+P01  Scalar / CREATE
+P02  Scalar / READ
+P03  Scalar / SET_VALUE
+P04  Scalar / REASSERT_NOOP
+P05  Set / CREATE_SET
+P06  Set / ADD_ITEM
+P07  Set / REMOVE_ITEM + Proposal + Confirm
+P08  Count / CREATE_COUNT
+P09  Count / Anonymous Delta / Non-execution
+P10  Record / SET_FIELD
+P11  Record / DELETE_FIELD + Proposal + Confirm
+P12  READ / UNKNOWN
+P13  CLARIFY / Ambiguous destructive mutation
+P14  History / READ_PREDECESSOR
+P15  FREEFORM / Non-memory
+
+============================================================
+建議判定標籤
+============================================================
+
+PASS
+- 真實 DeepSeek decision 正確
+- Application 行為正確
+- Memory / History / Revision / Proposal 符合預期
+
+FAIL — MODEL SEMANTIC
+- DeepSeek 選錯 intent / state_type / target / action / evidence
+
+FAIL — PROTOCOL
+- DeepSeek JSON shape / token / required field 不符合 protocol
+
+FAIL — APPLICATION
+- DeepSeek decision 正確，但 validator / transition / SQLite / history / revision / proposal 執行錯誤
+
+OPTIONAL SAFE-DEGRADE
+- OPTIONAL 功能未自動完成
+- 但沒有 hallucination、沒有錯誤 mutation、沒有污染 Current Memory
+
+HARD SAFETY FAIL
+- 發明資料
+- 猜 target
+- cross-collection mutation
+- stale clarification/pending 污染
+- destructive direct commit
+- 錯誤 History / Revision
+- 錯誤 user/session isolation
+
+============================================================
+結束
+============================================================

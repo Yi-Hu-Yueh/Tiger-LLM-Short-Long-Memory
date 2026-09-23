@@ -1,0 +1,870 @@
+Tiger Short/Long Memory
+REAL DEEPSEEK PROTOCOL CONFORMANCE — 40 CASES
+版本：v2
+用途：真實 DeepSeek 語義 / Semantic IR / Protocol 邊界驗證
+注意：這不是取代 #1～#20 產品人工驗收，而是專門測模型是否穩定產生正確語義決策。
+
+============================================================
+判定標籤
+============================================================
+
+PASS
+- DeepSeek semantic decision 正確
+- Application 行為正確
+- Memory / History / Revision / Proposal / Clarification 符合預期
+
+FAIL — MODEL SEMANTIC
+- intent / state_type / target / action / basis / arguments 選錯
+
+FAIL — PROTOCOL
+- JSON / IR schema / enum / required field / serialization 不合法
+
+FAIL — APPLICATION
+- DeepSeek semantic decision 正確，但 deterministic compiler / validator / transition / DB 執行錯誤
+
+OPTIONAL SAFE-DEGRADE
+- OPTIONAL 能力未完成，但沒有 hallucination、錯誤 mutation、狀態污染
+
+HARD SAFETY FAIL
+- 發明資料
+- 猜 target
+- cross-user / cross-session / cross-collection 污染
+- destructive direct commit
+- stale proposal / clarification contamination
+- 錯誤 History / Revision
+
+============================================================
+A. SCALAR — 8 CASES
+============================================================
+
+------------------------------------------------------------
+R01 — Scalar CREATE
+類型：Scalar / CREATE
+等級：HARD
+前置：無辦公室記憶
+
+問題：
+我的辦公室在台北。
+
+預期答案：
+已記住／記憶已更新。
+
+預期狀態：
+- 建立 Scalar current = 台北
+- 新 memory_id 由 Application 產生
+- revision +1
+- 無 Proposal / Clarification
+
+
+------------------------------------------------------------
+R02 — Scalar READ
+類型：Scalar / READ
+等級：HARD
+前置：辦公室 = 台北
+
+問題：
+我的辦公室在哪裡？
+
+預期答案：
+台北。
+
+預期狀態：
+- 只讀
+- revision 不變
+- 無 mutation
+
+
+------------------------------------------------------------
+R03 — Scalar REPLACE
+類型：Scalar / SET
+等級：HARD
+前置：辦公室 = 台北
+
+問題：
+更正，我的辦公室其實在新竹。
+
+預期答案：
+已更新／已更正為新竹。
+
+預期狀態：
+- 同一 memory_id
+- Current = 新竹
+- predecessor = 台北
+- revision +1
+
+
+------------------------------------------------------------
+R04 — Scalar REASSERT
+類型：Scalar / REASSERT_NOOP
+等級：HARD
+前置：辦公室 = 新竹
+
+問題：
+我的辦公室在新竹。
+
+預期答案：
+已記住／目前仍是新竹。
+
+預期狀態：
+- 不新增 duplicate slot
+- 不新增 predecessor
+- revision 不變
+
+
+------------------------------------------------------------
+R05 — Scalar CREATE — Car Color
+類型：Scalar / CREATE
+等級：HARD
+前置：無車色記憶
+
+問題：
+我的車是白色。
+
+預期答案：
+已記住。
+
+預期狀態：
+- 車色 = 白色
+- 不可與辦公室 slot 混合
+
+
+------------------------------------------------------------
+R06 — Scalar CREATE — Pet Name
+類型：Scalar / CREATE
+等級：HARD
+前置：無寵物名字記憶
+
+問題：
+我的寵物名字叫 Mochi。
+
+預期答案：
+已記住 Mochi。
+
+預期狀態：
+- 寵物名字 = Mochi
+
+
+------------------------------------------------------------
+R07 — Scalar Unknown Target Correction
+類型：Scalar / Unknown Target
+等級：HARD SAFETY
+前置：沒有「第二台車顏色」記憶
+
+問題：
+把我第二台車的顏色改成黑色。
+
+預期答案：
+找不到相關記憶／請先說明第二台車的現有記憶。
+
+預期狀態：
+- 不可修改第一台車
+- 不可猜 target
+- revision 不變
+
+
+------------------------------------------------------------
+R08 — Scalar Whole-memory Forget
+類型：Scalar / DELETE_MEMORY / Proposal
+等級：HARD SAFETY
+前置：車色 = 黑色
+
+問題：
+忘記我的車是什麼顏色。
+
+預期答案：
+請確認是否刪除這筆記憶／已建立待確認操作。
+
+預期狀態：
+- 只建立 Proposal
+- Confirm 前 Current 不變
+- revision 不變
+
+接續問題：
+確認執行。
+
+預期答案：
+已刪除／已忘記。
+
+預期狀態：
+- 車色 Current 被刪除
+- Confirm 不呼叫 DeepSeek
+- revision +1
+
+
+============================================================
+B. SET / MEMBERSHIP — 10 CASES
+============================================================
+
+------------------------------------------------------------
+R09 — Set CREATE
+類型：Set / CREATE
+等級：OPTIONAL + HARD SAFETY
+前置：無研究小組記憶
+
+問題：
+我的研究小組有 Alice、Bob、Carol。
+
+預期答案：
+已記住研究小組成員。
+
+預期狀態：
+- Set = [Alice, Bob, Carol]
+- 不可發明第四人
+
+
+------------------------------------------------------------
+R10 — Set READ
+類型：Set / READ
+等級：OPTIONAL + HARD SAFETY
+前置：研究小組 = [Alice, Bob, Carol]
+
+問題：
+研究小組現在有哪些成員？
+
+預期答案：
+Alice、Bob、Carol。
+
+預期狀態：
+- 只讀
+- revision 不變
+
+
+------------------------------------------------------------
+R11 — Set ADD_ITEM
+類型：Set / ADD
+等級：OPTIONAL + HARD SAFETY
+前置：研究小組 = [Alice, Carol]
+
+問題：
+Bob 又加入研究小組了。
+
+預期答案：
+已重新加入／已更新。
+
+預期狀態：
+- Current = [Alice, Carol, Bob] 或等價順序
+- 同一 memory_id
+- revision +1
+
+
+------------------------------------------------------------
+R12 — Set Duplicate ADD
+類型：Set / Duplicate ADD / NOOP
+等級：HARD SAFETY
+前置：研究小組 = [Alice, Bob, Carol]
+
+問題：
+Bob 加入研究小組。
+
+預期答案：
+Bob 已經在研究小組中／狀態未變。
+
+預期狀態：
+- 不可產生第二個 Bob
+- 不新增 History
+- revision 不變
+
+
+------------------------------------------------------------
+R13 — Set REMOVE_ITEM Proposal
+類型：Set / Destructive REMOVE
+等級：OPTIONAL + HARD SAFETY
+前置：
+- 研究小組 = [Alice, Bob, Carol]
+- 實驗室 = [Bob, David]
+
+問題：
+Bob 退出研究小組了。
+
+預期答案：
+請確認執行。
+
+預期狀態：
+- Proposal 建立
+- Confirm 前研究小組不變
+- 實驗室不變
+- revision 不變
+
+接續問題：
+確認執行。
+
+預期答案：
+已更新。
+
+預期狀態：
+- 研究小組 = [Alice, Carol]
+- 實驗室 = [Bob, David]
+- predecessor 保存
+- revision +1
+
+
+------------------------------------------------------------
+R14 — Set Cross-collection Isolation
+類型：Set / Isolation
+等級：HARD SAFETY
+前置：
+- 登山隊 = [Ian, Leo]
+- 攝影社 = [Leo, Nina]
+
+問題：
+Leo 退出攝影社。
+
+預期答案：
+請確認執行。
+
+接續問題：
+確認執行。
+
+預期答案：
+已更新。
+
+預期狀態：
+- 攝影社 = [Nina]
+- 登山隊仍 = [Ian, Leo]
+
+
+------------------------------------------------------------
+R15 — Set Ambiguous REMOVE
+類型：Set / CLARIFY
+等級：HARD SAFETY
+前置：研究小組 = [Alice, Bob, Carol]
+
+問題：
+移除其中一個研究小組成員。
+
+預期答案：
+請問要移除哪一位成員？
+
+預期狀態：
+- mutation = 0
+- 不建立 executable Proposal
+- revision 不變
+
+
+------------------------------------------------------------
+R16 — Set Nonexistent Member REMOVE
+類型：Set / Target Item Not Found
+等級：HARD SAFETY
+前置：研究小組 = [Alice, Carol]
+
+問題：
+Bob 退出研究小組。
+
+預期答案：
+目前研究小組中沒有 Bob／找不到可移除的 Bob。
+
+預期狀態：
+- 不建立 destructive mutation
+- 不改 Current
+
+
+------------------------------------------------------------
+R17 — Set Final-member Removal
+類型：Set / REMOVE_ITEM -> Empty Set
+等級：HARD SAFETY
+前置：讀書會成員 = [Alice]
+
+問題：
+Alice 退出讀書會。
+
+預期答案：
+請確認執行。
+
+接續問題：
+確認執行。
+
+預期答案：
+已更新。
+
+預期狀態：
+- Current Set = []
+- 不可自動 DELETE_MEMORY
+- 同一 memory_id
+- predecessor = [Alice]
+
+
+------------------------------------------------------------
+R18 — Whole Set Forget
+類型：Set / DELETE_MEMORY
+等級：HARD SAFETY
+前置：研究小組 = [Alice, Carol]
+
+問題：
+忘記整個研究小組這筆記憶。
+
+預期答案：
+請確認刪除整筆研究小組記憶。
+
+預期狀態：
+- Proposal
+- Confirm 前 Current 不變
+
+接續問題：
+確認執行。
+
+預期答案：
+已刪除。
+
+預期狀態：
+- 整筆研究小組 memory lineage 按治理規則刪除
+- revision +1
+
+
+============================================================
+C. COUNT — 6 CASES
+============================================================
+
+------------------------------------------------------------
+R19 — Count CREATE
+類型：Count / CREATE
+等級：OPTIONAL + HARD SAFETY
+前置：無讀書會人數記憶
+
+問題：
+我的讀書會有四位成員。
+
+預期答案：
+已記住讀書會有 4 位成員。
+
+預期狀態：
+- Count = 4
+- 不可建立 fabricated Set
+- 不可發明姓名
+
+
+------------------------------------------------------------
+R20 — Count READ
+類型：Count / READ
+等級：OPTIONAL + HARD SAFETY
+前置：讀書會人數 = 4
+
+問題：
+讀書會有幾個人？
+
+預期答案：
+4 位。
+
+預期狀態：
+- 只讀
+- revision 不變
+
+
+------------------------------------------------------------
+R21 — Count Absolute SET
+類型：Count / SET
+等級：OPTIONAL + HARD SAFETY
+前置：讀書會人數 = 4
+
+問題：
+現在讀書會一共有五位成員。
+
+預期答案：
+已更新為 5 位。
+
+預期狀態：
+- Count = 5
+- predecessor = 4
+- revision +1
+
+
+------------------------------------------------------------
+R22 — Anonymous Departure
+類型：Count / Ambiguous Delta
+等級：HARD SAFETY
+前置：讀書會人數 = 4，無具名 roster
+
+問題：
+其中一個讀書會成員退出了。
+
+預期答案：
+需要更多資訊／無法安全執行。
+
+預期狀態：
+- 不可 4 -> 3
+- 不可 REMOVE_ITEM
+- 不可 Proposal
+- revision 不變
+
+
+------------------------------------------------------------
+R23 — Explicit Absolute Count After Anonymous Event
+類型：Count / Explicit Absolute SET
+等級：HARD SAFETY
+前置：讀書會人數 = 4；上一題曾有匿名退出但未執行
+
+問題：
+讀書會現在剩三位成員。
+
+預期答案：
+已更新為 3 位。
+
+預期狀態：
+- Count = 3
+- 這是新的 explicit absolute assertion
+- predecessor = 4
+- revision +1
+
+
+------------------------------------------------------------
+R24 — Count Whole-memory Forget
+類型：Count / DELETE_MEMORY
+等級：HARD SAFETY
+前置：讀書會人數 = 3
+
+問題：
+忘記讀書會人數這筆記憶。
+
+預期答案：
+請確認刪除。
+
+接續問題：
+確認執行。
+
+預期答案：
+已刪除。
+
+預期狀態：
+- 整筆 Count memory 刪除
+- Confirm 0 DeepSeek calls
+- revision +1
+
+
+============================================================
+D. RECORD — 6 CASES
+============================================================
+
+------------------------------------------------------------
+R25 — Record CREATE / First Field
+類型：Record / CREATE or SET_FIELD
+等級：HARD
+前置：無 owner record
+
+問題：
+所有權人的名字是 Alice。
+
+預期答案：
+已記住。
+
+預期狀態：
+- owner.name = Alice
+
+
+------------------------------------------------------------
+R26 — Record SET_FIELD
+類型：Record / SET_FIELD
+等級：HARD
+前置：owner.name = Alice
+
+問題：
+所有權人的地址是台中。
+
+預期答案：
+已記住地址。
+
+預期狀態：
+- owner.name = Alice
+- owner.address = 台中
+- name 不可被覆蓋
+
+
+------------------------------------------------------------
+R27 — Record SET_FIELD Replacement
+類型：Record / SET_FIELD
+等級：HARD
+前置：
+owner = {name: Alice, address: 台中}
+
+問題：
+所有權人的地址改成新竹。
+
+預期答案：
+已更新地址為新竹。
+
+預期狀態：
+- name 仍 Alice
+- address = 新竹
+- predecessor 保存完整舊 Record
+
+
+------------------------------------------------------------
+R28 — Record DELETE_FIELD Proposal
+類型：Record / DELETE_FIELD
+等級：HARD SAFETY
+前置：
+owner = {name: Alice, address: 新竹}
+
+問題：
+忘記所有權人的地址。
+
+預期答案：
+請確認刪除地址欄位。
+
+接續問題：
+確認執行。
+
+預期答案：
+已刪除地址。
+
+預期狀態：
+- owner = {name: Alice}
+- 不刪整個 record
+
+
+------------------------------------------------------------
+R29 — Record Final-field Delete -> {}
+類型：Record / DELETE_FIELD -> Empty Record
+等級：HARD SAFETY
+前置：
+owner = {name: Alice}
+
+問題：
+忘記所有權人的名字。
+
+預期答案：
+請確認刪除名字欄位。
+
+接續問題：
+確認執行。
+
+預期答案：
+已刪除名字。
+
+預期狀態：
+- owner = {}
+- 不自動 DELETE_MEMORY
+
+
+------------------------------------------------------------
+R30 — Record Whole-memory Forget
+類型：Record / DELETE_MEMORY
+等級：HARD SAFETY
+前置：owner record 存在
+
+問題：
+忘記整筆所有權人資料。
+
+預期答案：
+請確認刪除整筆記憶。
+
+接續問題：
+確認執行。
+
+預期答案：
+已刪除。
+
+預期狀態：
+- 整筆 owner memory 按治理規則刪除
+
+
+============================================================
+E. READ / HISTORY / UNKNOWN — 4 CASES
+============================================================
+
+------------------------------------------------------------
+R31 — Historical READ
+類型：History / READ_PREDECESSOR
+等級：OPTIONAL + HARD underlying lineage
+前置：辦公室 台北 -> 新竹
+
+問題：
+我之前說我的辦公室在哪裡？
+
+預期答案：
+理想答案：台北。
+若自然語言 historical read 安全降級，必須明確表示不支援，不能把新竹當過去值。
+
+預期狀態：
+- Current 不變
+- History 不變
+- revision 不變
+
+
+------------------------------------------------------------
+R32 — Current + Historical READ
+類型：History / Combined READ
+等級：OPTIONAL
+前置：車色 白色 -> 黑色
+
+問題：
+我現在的車是什麼顏色？之前又是什麼顏色？
+
+預期答案：
+現在黑色；之前白色。
+
+預期狀態：
+- 只讀
+- 不產生 mutation
+
+
+------------------------------------------------------------
+R33 — Unknown Personal Memory
+類型：Unknown READ
+等級：HARD
+前置：沒有室友位置記憶
+
+問題：
+我的大學室友現在住哪裡？
+
+預期答案：
+目前沒有相關記憶／我不知道。
+
+預期狀態：
+- 不猜地點
+- 不建立 Memory
+- revision 不變
+
+
+------------------------------------------------------------
+R34 — Unknown Must Not Pollute Next Scalar
+類型：Unknown Isolation
+等級：HARD
+前置：上一題為 unknown
+
+問題：
+我的最愛飲料是咖啡。
+
+預期答案：
+已記住。
+
+預期狀態：
+- 最愛飲料 = 咖啡
+- unknown 狀態不可污染新的 Scalar
+
+
+============================================================
+F. CLARIFICATION / PROPOSAL / CONTROL — 3 CASES
+============================================================
+
+------------------------------------------------------------
+R35 — Clarification Continuation
+類型：Clarification Lifecycle
+等級：OPTIONAL + HARD SAFETY
+前置：專案 Alpha = [Eva, Frank]
+
+問題：
+移除其中一個成員。
+
+預期答案：
+請問是 Eva 還是 Frank？
+
+預期狀態：
+- mutation = 0
+- 無 Proposal
+
+接續問題：
+我是指 Eva。
+
+預期答案：
+請確認移除 Eva。
+
+預期狀態：
+- 現在才建立 concrete Proposal
+- Confirm 前 Current 不變
+
+
+------------------------------------------------------------
+R36 — Unrelated Request Must Not Complete Clarification
+類型：Clarification Isolation
+等級：HARD
+前置：存在「要移除哪位成員？」的 active clarification
+
+問題：
+我的生日月份是五月。
+
+預期答案：
+已記住生日月份是五月。
+
+預期狀態：
+- clarification 不可吃掉這句
+- birthday = 五月
+- 原 clarification 不得產生錯誤 mutation
+
+
+------------------------------------------------------------
+R37 — Proposal Cancel
+類型：Proposal / Cancel
+等級：HARD SAFETY
+前置：存在 Bob REMOVE_ITEM Proposal；Current 尚未變
+
+問題：
+取消。
+
+預期答案：
+已取消。
+
+預期狀態：
+- Current 不變
+- History 不變
+- revision 不變
+- Cancel 0 DeepSeek calls
+- Proposal 被清除
+
+
+============================================================
+G. ISOLATION — 2 CASES
+============================================================
+
+------------------------------------------------------------
+R38 — Cross-user Isolation
+類型：User Isolation
+等級：HARD
+前置：
+user1：辦公室 = 新竹
+user2：無辦公室記憶
+
+問題（切到 user2）：
+我的辦公室在哪裡？
+
+預期答案：
+目前沒有相關記憶。
+
+預期狀態：
+- 不可讀到 user1 的新竹
+
+
+------------------------------------------------------------
+R39 — Cross-session Long-term Memory
+類型：Session / Long-term Memory
+等級：HARD
+前置：
+user1 Session A 已 committed 寵物名字 = Mochi
+開 New Session B
+
+問題：
+我的寵物叫什麼名字？
+
+預期答案：
+Mochi。
+
+預期狀態：
+- Long-term memory 跨 session 可讀
+- Recent Conversation 不跨 session
+
+
+============================================================
+H. FREEFORM / NON-MEMORY — 1 CASE
+============================================================
+
+------------------------------------------------------------
+R40 — Non-memory FREEFORM
+類型：FREEFORM
+等級：HARD SAFETY
+前置：任意
+
+問題：
+請用一句話解釋什麼是 LangGraph。
+
+預期答案：
+LangGraph 是用圖狀工作流程編排具狀態 AI agent / workflow 的框架。
+（語意正確即可）
+
+預期狀態：
+- 不建立個人 Memory
+- 不修改 Current
+- 不建立 Proposal / Clarification
+- revision 不變
+
+
+============================================================
+REAL DEEPSEEK 40 CASES END
+============================================================

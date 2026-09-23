@@ -1,0 +1,1425 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DeepSeek Cross-Session Memory</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; background: #f5f7fb; color: #172033; }
+    body { margin: 0; }
+    main { max-width: 980px; margin: 24px auto; padding: 0 16px; display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+    header { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    h1 { font-size: 1.25rem; margin: 0 auto 0 0; }
+    section { background: white; border: 1px solid #d9dfeb; border-radius: 10px; padding: 14px; }
+    button, select, input, textarea { font: inherit; }
+    button { cursor: pointer; padding: 8px 12px; border: 1px solid #9ba7bc; border-radius: 7px; background: #fff; }
+    button.primary { background: #2859d6; color: white; border-color: #2859d6; }
+    button.danger { color: #a11; }
+    #chat { min-height: 360px; max-height: 58vh; overflow-y: auto; }
+    .message { padding: 9px 11px; margin: 8px 0; border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .user { background: #e8efff; margin-left: 12%; }
+    .assistant { background: #eef0f3; margin-right: 12%; }
+    #proposalBox { margin-top: 10px; padding: 10px; border: 1px solid #d2a93a; border-radius: 8px; background: #fff9e8; }
+    #proposalText { margin: 6px 0 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    #proposalState { margin: 4px 0; }
+    #proposalDestructive { color: #a11; font-weight: 700; }
+    #proposalCorrection { margin-top: 10px; padding-top: 10px; border-top: 1px solid #d2a93a; }
+    #proposalCorrectionFields { display: grid; gap: 7px; margin-bottom: 8px; }
+    #proposalCorrectionFields label { display: grid; gap: 3px; }
+    #proposalCorrectionFields input, #proposalCorrectionFields select { box-sizing: border-box; width: 100%; padding: 6px; }
+    #clarificationBox { margin-top: 10px; padding: 10px; border: 1px solid #7392c8; border-radius: 8px; background: #f2f6ff; }
+    #clarificationText { margin-top: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    form { display: flex; gap: 8px; margin-top: 10px; }
+    textarea { flex: 1; min-height: 58px; resize: vertical; padding: 8px; }
+    #memoryList { padding-left: 22px; overflow-wrap: anywhere; }
+    #status { grid-column: 1 / -1; min-height: 1.4em; color: #a11; }
+    details { margin-top: 14px; }
+    details input { width: 100%; box-sizing: border-box; padding: 7px; }
+    small { color: #5b6575; }
+    #productMode { grid-column: 1 / -1; border: 2px solid #1f6f43; background: #f2fbf6; }
+    #productMode[data-auto-status="STOPPED_BY_FROZEN_BENCHMARK"] { border-color: #9f2d20; background: #fff4f2; }
+    #productMode h2 { margin: 0 0 6px; font-size: 1.1rem; }
+    .product-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 16px; }
+    .product-wide { grid-column: 1 / -1; }
+    #testRunner { grid-column: 1 / -1; }
+    #testRunner h2 { margin: 0 0 6px; font-size: 1.1rem; }
+    #testMemoryPanel { margin: 12px 0; padding: 11px; border: 1px solid #8aa6d8; border-radius: 8px; background: #f4f7ff; }
+    #testMemoryPanel h3 { margin: 0 0 8px; font-size: 1rem; }
+    #testMemoryList { margin: 5px 0 0; padding-left: 22px; overflow-wrap: anywhere; }
+    .suite-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+    .runner-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px 14px; }
+    .runner-grid div { min-width: 0; overflow-wrap: anywhere; }
+    .runner-wide { grid-column: 1 / -1; }
+    #runnerStatus[data-state="FAIL"] { border-color: #b42318; background: #fff1f0; }
+    #runnerStatus[data-state="PASS"] { border-color: #16803a; background: #effbf2; }
+    #runnerStatus[data-state="WAITING_FOR_HUMAN_REVIEW"] { border-color: #b7791f; background: #fffaf0; }
+    #runnerHumanReview { margin-top: 10px; padding: 12px; border: 2px solid #b7791f; border-radius: 8px; background: #fffaf0; }
+    #runnerHumanReview dl { display: grid; grid-template-columns: max-content 1fr; gap: 5px 12px; }
+    #runnerHumanReview dt { font-weight: 700; }
+    #runnerHumanReview dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    #runnerHumanReviewActions { display: flex; gap: 8px; margin-top: 10px; }
+    #runnerFailure { margin-top: 10px; padding: 10px; white-space: pre-wrap; border: 1px solid #b42318; background: #fff1f0; color: #7a1712; }
+    #caseDefinitions { max-height: 330px; overflow: auto; }
+    .case-definition { border-top: 1px solid #e1e5ec; padding: 7px 0; }
+    .check-pass { color: #16803a; } .check-fail { color: #b42318; }
+    #ontologyDiagnostic { grid-column: 1 / -1; border: 2px solid #654bb5; }
+    #ontologyDiagnostic h2 { margin: 0 0 6px; font-size: 1.1rem; }
+    .diagnostic-badge { display: inline-block; margin: 5px 0 10px; padding: 5px 9px; border-radius: 999px; background: #efeaff; color: #3f277f; font-weight: 800; }
+    .diagnostic-risk { margin: 10px 0; padding: 9px; border: 1px solid #b7791f; border-radius: 7px; background: #fffaf0; }
+    .diagnostic-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 16px; }
+    .diagnostic-wide { grid-column: 1 / -1; }
+    .diagnostic-output { margin: 4px 0 0; padding: 8px; max-height: 260px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: #f6f7fa; border-radius: 6px; }
+    #diagnosticJudgment { margin-top: 10px; }
+    #diagnosticJudgment[data-value="Semantic Correct"] { color: #16803a; }
+    #diagnosticJudgment[data-value="Semantic Incorrect"] { color: #b42318; }
+
+    #productionShadow { grid-column: 1 / -1; border: 2px solid #6b5bd2; border-radius: 10px; padding: 14px; background: #f7f5ff; }
+    #productionShadow textarea { width: 100%; min-height: 70px; box-sizing: border-box; margin: 8px 0; }
+    #shadowResult { max-height: 520px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: #fff; padding: 10px; border-radius: 6px; }
+    #shadowSummary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+    #shadowSummary > div { background: #fff; border-radius: 6px; padding: 7px; }
+    #legacyCutoverReview { grid-column: 1 / -1; border: 2px solid #b26a00; border-radius: 10px; padding: 14px; background: #fff9ef; }
+    #legacyCutoverControls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+    #legacyCutoverControls label { display: flex; flex-direction: column; gap: 4px; }
+    #legacyCutoverControls input, #legacyCutoverControls select { width: 100%; box-sizing: border-box; }
+    #legacyCutoverResult { max-height: 420px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: #fff; padding: 10px; border-radius: 6px; }
+    @media (max-width: 720px) { main { grid-template-columns: 1fr; } header { grid-column: 1; } #status { grid-column: 1; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>DeepSeek Cross-Session Memory</h1>
+    <label>User <select id="userSelect" aria-label="Test user"><option>user1</option><option>user2</option></select></label>
+    <button id="newSession">New Conversation / New Session</button>
+    <button id="clearData" class="danger">Clear User Data</button>
+  </header>
+  <section id="productMode" data-auto-status="LOADING">
+    <h2>Human-Reviewed Memory Assistant</h2>
+    <div class="diagnostic-badge">PRODUCT MODE — HUMAN REVIEW REQUIRED FOR MODEL-DERIVED CHANGED WRITES</div>
+    <div class="product-grid">
+      <div><strong>Product mode</strong><br><span id="productModeValue">LOADING</span></div>
+      <div><strong>Automatic semantic memory</strong><br><span id="productAutomaticStatus">LOADING</span></div>
+      <div><strong>Production auto-commit</strong><br><span id="productAutoCommit">LOADING</span></div>
+      <div><strong>Human-reviewed memory</strong><br><span id="productHumanReview">LOADING</span></div>
+      <div><strong>Archived freeze</strong><br><span id="productFreeze">—</span></div>
+      <div><strong>Automatic benchmark</strong><br><span id="productBenchmarkLock">LOADING</span></div>
+      <div class="product-wide"><strong>Current product integration</strong><br><span id="productCutover">LOADING</span></div>
+      <div class="product-wide"><small id="productStopEvidence">Loading archived stop evidence…</small></div>
+    </div>
+  </section>
+  <section>
+    <div><small id="sessionLabel">No session</small></div>
+    <div id="chat" aria-live="polite"></div>
+    <div id="proposalBox" hidden>
+      <strong id="legacyProposalHeading">Pending memory update</strong>
+      <strong id="semanticProposalHeading" hidden>Pending Memory Change</strong>
+      <div id="proposalState" hidden><small>Pending confirmation</small></div>
+      <div id="proposalText"></div>
+      <div id="proposalDestructive" hidden>Destructive change</div>
+      <div id="proposalNote"><small>請先確認或取消待處理的記憶更新。</small></div>
+      <button id="confirmProposal" type="button" class="primary">Confirm</button>
+      <button id="correctProposal" type="button" hidden>Correct</button>
+      <button id="cancelProposal" type="button">Cancel</button>
+      <div id="proposalCorrection" hidden>
+        <div id="proposalCorrectionFields"></div>
+        <button id="submitCorrection" type="button" class="primary">Replace proposal</button>
+        <button id="closeCorrection" type="button">Close</button>
+      </div>
+    </div>
+    <div id="clarificationBox" hidden>
+      <strong>Clarification needed</strong>
+      <div id="clarificationText"></div>
+      <small>這不是已提交的記憶；請在一般訊息欄補充資料。</small>
+    </div>
+    <form id="chatForm">
+      <textarea id="messageInput" maxlength="4000" required placeholder="Type a message…" aria-label="Message"></textarea>
+      <button id="sendButton" class="primary" type="submit">Send</button>
+    </form>
+  </section>
+  <section>
+    <h2 id="normalMemoryHeading">Normal Chat Memory</h2>
+    <ul id="memoryList"><li>No saved memories</li></ul>
+    <details>
+      <summary>API key fallback</summary>
+      <p><small>Used only when the server has no DEEPSEEK_API_KEY. It is sent to this localhost service and is never stored.</small></p>
+      <input id="apiKey" type="password" autocomplete="off" placeholder="DeepSeek API key">
+    </details>
+  </section>
+  <section id="productionShadow">
+    <h2>HR-P2 Production Ontology Shadow</h2>
+    <div class="diagnostic-badge">REAL NORMAL CHAT CURRENT — SHADOW ONLY — ZERO PROPOSAL / ZERO MUTATION</div>
+    <p><small>Uses the selected Normal Chat user/session and real Current snapshot. Legacy rows are never guessed into ontology slots. One DeepSeek call; no chat message, proposal, Current, History, or revision write.</small></p>
+    <textarea id="shadowMessage" maxlength="4000" placeholder="Type one message to shadow against the selected Normal Chat Current…"></textarea>
+    <button id="runProductionShadow" type="button" class="primary">Run production shadow</button>
+    <div id="shadowSummary">
+      <div><strong>Status</strong><br><span id="shadowStatus">IDLE</span></div>
+      <div><strong>Real revision</strong><br><span id="shadowRevision">—</span></div>
+      <div><strong>Ontology / legacy Current</strong><br><span id="shadowCoverage">—</span></div>
+      <div><strong>HR-P3 cutover gate</strong><br><span id="shadowCutoverGate">—</span></div>
+    </div>
+    <pre id="shadowResult">—</pre>
+    <div id="hrP3ProposalBox" style="margin-top:12px;">
+      <h3>HR-P3 Production Human Review Proposal</h3>
+      <div class="diagnostic-badge">REAL NORMAL CHAT DB — PROPOSAL ONLY — NO CURRENT/HISTORY/REVISION COMMIT</div>
+      <p><small>Consumes only the server-issued review token from the exact HR-P2 shadow result. Creates a real pending Human Review proposal in Normal Chat, but does not Confirm or mutate Current.</small></p>
+      <button id="createHrP3Proposal" type="button" disabled>Create production Human Review proposal</button>
+      <pre id="hrP3ProposalResult">—</pre>
+    </div>
+  </section>
+  <section id="legacyCutoverReview">
+    <h2>HR-P2L2 Human-Confirmed Legacy Cutover</h2>
+    <div class="diagnostic-badge">HUMAN-SELECTION ONLY — PREVIEW FIRST — EXPLICIT APPLY REQUIRED</div>
+    <p><small>Lists exact legacy Current rows from Normal Chat. The application never infers a slot or value from legacy prose. Preview is zero-mutation; apply requires the exact server-issued review token plus explicit human confirmation, preserves memory_id, archives the legacy predecessor, and increments revision once.</small></p>
+    <button id="refreshLegacyInventory" type="button">Refresh legacy inventory</button>
+    <div><strong>Inventory</strong> <span id="legacyInventorySummary">Not loaded</span></div>
+    <div id="legacyCutoverControls">
+      <label>Legacy memory
+        <select id="legacyMemorySelect"><option value="">Load inventory first</option></select>
+      </label>
+      <label>Canonical slot
+        <select id="legacySlotSelect"><option value="">Load inventory first</option></select>
+      </label>
+      <label style="grid-column: 1 / -1;">Human-entered canonical value
+        <input id="legacyCanonicalValue" type="text" maxlength="160" placeholder="Type the canonical value exactly; the application will not parse legacy prose">
+      </label>
+    </div>
+    <button id="previewLegacyCutover" type="button" class="primary">Preview same-lineage adoption</button>
+    <label style="display:flex; gap:8px; align-items:center; margin-top:10px;">
+      <input id="confirmLegacyCutover" type="checkbox" disabled>
+      I reviewed the exact legacy content, canonical slot, and canonical value above and want to apply this same-lineage conversion.
+    </label>
+    <button id="applyLegacyCutover" type="button" class="danger" disabled>Apply reviewed same-lineage adoption</button>
+    <pre id="legacyCutoverResult">—</pre>
+    <h3>HR-P2L2 Apply Result</h3>
+    <pre id="legacyCutoverApplyResult">—</pre>
+  </section>
+  <section id="testRunner">
+    <h2>Automated Memory Test Runner</h2>
+    <small>Each run clears only its dedicated test database. Production database untouched.</small>
+    <div class="suite-actions">
+      <button class="suite-run primary" data-suite="v2gate" type="button" disabled>Semantic IR v2 + Confirmation Live Gate (5)</button>
+      <button class="suite-run primary" data-suite="real40" type="button" disabled>Real DeepSeek 40 — Semantic IR v1</button>
+      <button class="suite-run primary" data-suite="real40v2" type="button" disabled>Real DeepSeek 40 — Semantic IR v2</button>
+      <button class="suite-run primary" data-suite="offline60" type="button" disabled>Semantic Contract Offline 60</button>
+      <button class="suite-run primary" data-suite="master100" type="button" disabled>Master 40+60</button>
+    </div>
+    <div id="testMemoryPanel">
+      <h3 id="testMemoryHeading">Automated Test Memory</h3>
+      <div><strong>Test Database:</strong> <span id="testDbName">No test suite selected</span></div>
+      <div><strong>Current Test User:</strong> <span id="testMemoryUser">—</span></div>
+      <div><strong>Current Test Session:</strong> <span id="testMemorySession">—</span></div>
+      <div><strong>Current Revision:</strong> <span id="testMemoryRevision">—</span></div>
+      <div><strong>Current Test Memory:</strong> <span id="testMemoryStatus">No test memory loaded</span></div>
+      <ul id="testMemoryList"></ul>
+    </div>
+    <div id="runnerStatus" class="runner-grid" data-state="IDLE" aria-live="polite">
+      <div><strong>Suite</strong><br><span id="runnerSuite">—</span></div>
+      <div><strong>Protocol</strong><br><span id="runnerProtocol">—</span></div>
+      <div><strong>Provider</strong><br><span id="runnerProvider">—</span></div>
+      <div><strong>Status</strong><br><span id="runnerState">IDLE</span></div>
+      <div><strong>Progress</strong><br><span id="runnerProgress">0 / 0</span></div>
+      <div><strong>Elapsed</strong><br><span id="runnerElapsed">0.0 s</span></div>
+      <div><strong>Passed</strong><br><span id="runnerPassed">0</span></div>
+      <div><strong>Safe-degrade</strong><br><span id="runnerDegraded">0</span></div>
+      <div><strong>Provider calls</strong><br><span id="runnerCalls">0</span></div>
+      <div><strong>Human-reviewed writes</strong><br><span id="runnerReviewed">0</span></div>
+      <div><strong>Confirmed</strong><br><span id="runnerConfirmed">0</span></div>
+      <div><strong>Rejected</strong><br><span id="runnerRejected">0</span></div>
+      <div><strong>Proposal check</strong><br><span id="runnerProposalCheck">—</span></div>
+      <div><strong>Auto-confirm</strong><br><span id="runnerAutoConfirm">—</span></div>
+      <div><strong>Acceptance</strong><br><span id="runnerAcceptance">—</span></div>
+      <div class="runner-wide"><strong>Current case</strong><br><span id="runnerCase">—</span></div>
+      <div class="runner-wide"><strong>Type</strong><br><span id="runnerType">—</span></div>
+      <div class="runner-wide"><strong>Question</strong><br><span id="runnerQuestion">—</span></div>
+      <div class="runner-wide"><strong>Expected answer</strong><br><span id="runnerExpected">—</span></div>
+      <div class="runner-wide"><strong>Actual answer</strong><br><span id="runnerActual">—</span></div>
+      <div class="runner-wide"><strong>Checks</strong><br><span id="runnerChecks">—</span></div>
+      <div class="runner-wide"><strong>Diagnostic stages</strong><br><span id="runnerDiagnosticStages">—</span></div>
+    </div>
+    <div id="runnerHumanReview" hidden>
+      <strong>Human Review Required</strong>
+      <dl>
+        <dt>Case ID</dt><dd id="reviewCaseId">—</dd>
+        <dt>Question</dt><dd id="reviewQuestion">—</dd>
+        <dt>Expected semantic meaning</dt><dd id="reviewExpected">—</dd>
+        <dt>Rendered proposed mutation</dt><dd id="reviewRendered">—</dd>
+        <dt>State type</dt><dd id="reviewStateType">—</dd>
+        <dt>Operation</dt><dd id="reviewOperation">—</dd>
+        <dt>Target/create subject</dt><dd id="reviewSubject">—</dd>
+        <dt>Proposed value/item/state</dt><dd id="reviewValue">—</dd>
+        <dt>Destructive</dt><dd id="reviewDestructive">—</dd>
+        <dt>Current revision</dt><dd id="reviewRevision">—</dd>
+        <dt>Provider calls</dt><dd id="reviewProviderCalls">—</dd>
+      </dl>
+      <div id="runnerHumanReviewActions">
+        <button id="confirmTestProposal" type="button" class="primary">Confirm Proposal</button>
+        <button id="rejectTestProposal" type="button" class="danger">Reject Proposal</button>
+      </div>
+    </div>
+    <div id="runnerFailure" hidden></div>
+    <details id="caseDefinitionDetails">
+      <summary>View authoritative structured case definitions</summary>
+      <label>Suite <select id="caseSuiteSelect"><option value="v2gate">Semantic IR v2 + Confirmation Live Gate (5)</option><option value="real40">Real40 v1</option><option value="real40v2">Real40 v2</option><option value="offline60">Offline60</option><option value="master100">Master100</option></select></label>
+      <div id="caseDefinitions"></div>
+    </details>
+  </section>
+  <section id="ontologyDiagnostic">
+    <h2>Ontology Extraction Diagnostic</h2>
+    <div class="diagnostic-badge">DIAGNOSTIC EXTRACTION — ZERO USER-MEMORY PERSISTENCE</div>
+    <div><small>The extraction Run itself cannot write Current, History, revision, or proposals. The optional isolated-proposal action writes only to a dedicated diagnostic DB and never commits Current.</small></div>
+    <div class="diagnostic-risk"><strong>Residual semantic risk:</strong> Exact grounding proves provenance, not semantic correctness. Wrong-but-exact literals may pass grounding.</div>
+    <div class="suite-actions">
+      <label>Case <select id="diagnosticCase" disabled><option>Loading cases…</option></select></label>
+      <button id="runDiagnostic" class="primary" type="button" disabled>Run selected case</button>
+    </div>
+    <div class="diagnostic-grid" aria-live="polite">
+      <div><strong>Case ID</strong><br><span id="diagnosticCaseId">—</span></div>
+      <div><strong>Status</strong><br><span id="diagnosticState">IDLE</span></div>
+      <div class="diagnostic-wide"><strong>Question</strong><br><span id="diagnosticQuestion">—</span></div>
+      <div class="diagnostic-wide"><strong>Expected semantic meaning</strong><br><span id="diagnosticExpected">—</span></div>
+      <div><strong>Provider calls this run</strong><br><span id="diagnosticRunCalls">0</span></div>
+      <div><strong>Cumulative diagnostic calls</strong><br><span id="diagnosticTotalCalls">0</span></div>
+      <div class="diagnostic-wide"><strong>MODEL SEMANTIC SELECTION</strong><pre id="diagnosticModel" class="diagnostic-output">—</pre></div>
+      <div class="diagnostic-wide"><strong>APPLICATION REGISTRY DERIVATION</strong><pre id="diagnosticApplication" class="diagnostic-output">—</pre></div>
+      <div class="diagnostic-wide"><strong>APPLICATION EXACT SPAN RESOLUTION</strong><pre id="diagnosticOperands" class="diagnostic-output">—</pre></div>
+      <div class="diagnostic-wide"><strong>APPLICATION COMPILER PREVIEW</strong><br><small>Dormant typed action candidate only — no risk decision or persistence.</small><pre id="diagnosticCompiler" class="diagnostic-output">—</pre></div>
+      <div class="diagnostic-wide"><strong>APPLICATION PRECONDITION PREVIEW</strong><br><span class="diagnostic-badge">SYNTHETIC AUTHORITATIVE TEST STATE — NOT USER MEMORY</span><pre id="diagnosticPrecondition" class="diagnostic-output">—</pre></div>
+      <div class="diagnostic-wide"><strong>APPLICATION RISK PREVIEW</strong><br><span class="diagnostic-badge">PREVIEW ONLY — NO ROUTING / NO PERSISTENCE</span><pre id="diagnosticRisk" class="diagnostic-output">—</pre></div>
+      <div class="diagnostic-wide"><strong>APPLICATION ROUTING PREVIEW</strong><br><span class="diagnostic-badge">PREVIEW ONLY — NO PROPOSAL / NO COMMIT / NO PERSISTENCE</span><pre id="diagnosticRouting" class="diagnostic-output">—</pre></div>
+      <div class="diagnostic-wide"><strong>HUMAN REVIEW PAYLOAD PREVIEW</strong><br><small>Canonical facts only — no proposal ID, revision binding, Confirm, Correct, or Cancel.</small><pre id="diagnosticHumanReviewPayload" class="diagnostic-output">—</pre></div>
+      <div class="diagnostic-wide"><strong>ISOLATED HUMAN REVIEW PROPOSAL PERSISTENCE</strong><br><span class="diagnostic-badge">DEDICATED DIAGNOSTIC DB — PROPOSAL ONLY — CURRENT/HISTORY/REVISION UNCHANGED</span><pre id="diagnosticPersistedProposal" class="diagnostic-output">—</pre></div>
+      <div class="diagnostic-wide"><strong>ISOLATED LOCAL CONFIRM RESULT</strong><br><span class="diagnostic-badge">DEDICATED DIAGNOSTIC DB — LOCAL CONFIRM — USER MEMORY UNCHANGED</span><pre id="diagnosticConfirmResult" class="diagnostic-output">—</pre></div>
+      <div class="diagnostic-wide"><strong>Raw model semantic selection (sanitized)</strong><br><small>Legacy source_start/source_end, if present: NON-AUTHORITATIVE MODEL OFFSETS</small><pre id="diagnosticRaw" class="diagnostic-output">—</pre></div>
+      <div><strong>Grounding</strong><br><span id="diagnosticGrounding">—</span></div>
+      <div><strong>Validation diagnostic</strong><br><span id="diagnosticReason">—</span></div>
+      <div class="diagnostic-wide"><strong>Zero-mutation guarantee</strong><br><span id="diagnosticMutation">Current changed: NO | History changed: NO | Revision changed: NO | Proposal created: NO</span></div>
+    </div>
+    <div id="diagnosticJudgment" data-value="">Manual semantic judgment: NOT RECORDED</div>
+    <div class="suite-actions">
+      <button id="diagnosticCorrect" type="button" disabled>Semantic Correct</button>
+      <button id="diagnosticIncorrect" type="button" disabled>Semantic Incorrect</button>
+      <button id="diagnosticCreateProposal" type="button" disabled>Create isolated proposal</button>
+      <button id="diagnosticLoadProposal" type="button" disabled>Load isolated proposal</button>
+      <button id="diagnosticConfirmProposal" type="button" disabled>Confirm isolated proposal</button>
+    </div>
+  </section>
+  <section id="ontologyBenchmark">
+    <h2>Archived Automatic Ontology/Risk Benchmark</h2>
+    <div class="diagnostic-badge">ARCHIVED / LOCKED — AUTOMATIC SEMANTIC MEMORY STOPPED</div>
+    <div><small>The frozen automatic-memory run is historical evidence only. Product mode blocks preflight and held-out execution; Human-Reviewed Memory is the active product direction.</small></div>
+    <div class="diagnostic-grid" aria-live="polite">
+      <div><strong>Freeze status</strong><br><span id="benchmarkFreezeStatus">LOADING</span></div>
+      <div><strong>Freeze ID</strong><br><span id="benchmarkFreezeId">—</span></div>
+      <div><strong>Held-out turns</strong><br><span id="benchmarkTurnCount">—</span></div>
+      <div><strong>Auto-eligible turns</strong><br><span id="benchmarkAutoCount">—</span></div>
+      <div><strong>Guardrail turns</strong><br><span id="benchmarkGuardCount">—</span></div>
+      <div><strong>Batch run enabled</strong><br><span id="benchmarkBatchEnabled">NO</span></div>
+      <div class="diagnostic-wide"><strong>FROZEN MANIFEST / THRESHOLDS</strong><pre id="benchmarkManifest" class="diagnostic-output">—</pre></div>
+    </div>
+    <div class="diagnostic-risk"><strong>Archived:</strong> Preflight execution is disabled under POLICY-23.</div>
+    <div class="suite-actions">
+      <label>Preflight <select id="benchmarkPreflightCase" disabled><option>Loading preflight…</option></select></label>
+      <button id="runBenchmarkPreflight" class="primary" type="button" disabled>Run selected preflight</button>
+    </div>
+    <div class="diagnostic-grid" aria-live="polite">
+      <div><strong>Preflight status</strong><br><span id="benchmarkPreflightState">IDLE</span></div>
+      <div><strong>Provider calls this run</strong><br><span id="benchmarkPreflightCalls">0</span></div>
+      <div class="diagnostic-wide"><strong>Preflight result</strong><pre id="benchmarkPreflightResult" class="diagnostic-output">—</pre></div>
+    </div>
+    <div class="diagnostic-risk"><strong>Archived STOP:</strong> The prior held-out run locked after unsafe auto-commit evidence. Further execution is forbidden for this architecture/model.</div>
+    <div class="suite-actions">
+      <label><input id="benchmarkHeldoutConfirm" type="checkbox"> I understand the next stage counts in the frozen held-out benchmark</label>
+      <button id="runBenchmarkHeldoutStage" class="primary" type="button" disabled>Run next frozen stage</button>
+    </div>
+    <div class="diagnostic-grid" aria-live="polite">
+      <div><strong>Held-out completed</strong><br><span id="benchmarkHeldoutCompleted">0 / 660</span></div>
+      <div><strong>Next stage target</strong><br><span id="benchmarkHeldoutNextTarget">—</span></div>
+      <div><strong>Next provider calls</strong><br><span id="benchmarkHeldoutNextCalls">0</span></div>
+      <div><strong>Run locked</strong><br><span id="benchmarkHeldoutLocked">NO</span></div>
+      <div class="diagnostic-wide"><strong>Official held-out stage result</strong><pre id="benchmarkHeldoutResult" class="diagnostic-output">—</pre></div>
+    </div>
+  </section>
+  <div id="status" role="status"></div>
+</main>
+<script>
+  const userSelect = document.querySelector('#userSelect');
+  const chat = document.querySelector('#chat');
+  const memories = document.querySelector('#memoryList');
+  const normalMemoryHeading = document.querySelector('#normalMemoryHeading');
+  const status = document.querySelector('#status');
+  const messageInput = document.querySelector('#messageInput');
+  const sendButton = document.querySelector('#sendButton');
+  const chatForm = document.querySelector('#chatForm');
+  const newSessionButton = document.querySelector('#newSession');
+  const clearDataButton = document.querySelector('#clearData');
+  const confirmProposalButton = document.querySelector('#confirmProposal');
+  const correctProposalButton = document.querySelector('#correctProposal');
+  const cancelProposalButton = document.querySelector('#cancelProposal');
+  const submitCorrectionButton = document.querySelector('#submitCorrection');
+  const closeCorrectionButton = document.querySelector('#closeCorrection');
+  const sessionLabel = document.querySelector('#sessionLabel');
+  const proposalBox = document.querySelector('#proposalBox');
+  const legacyProposalHeading = document.querySelector('#legacyProposalHeading');
+  const semanticProposalHeading = document.querySelector('#semanticProposalHeading');
+  const proposalText = document.querySelector('#proposalText');
+  const proposalState = document.querySelector('#proposalState');
+  const proposalDestructive = document.querySelector('#proposalDestructive');
+  const proposalCorrection = document.querySelector('#proposalCorrection');
+  const proposalCorrectionFields = document.querySelector('#proposalCorrectionFields');
+  const clarificationBox = document.querySelector('#clarificationBox');
+  const clarificationText = document.querySelector('#clarificationText');
+  const suiteButtons = [...document.querySelectorAll('.suite-run')];
+  const runnerStatus = document.querySelector('#runnerStatus');
+  const caseSuiteSelect = document.querySelector('#caseSuiteSelect');
+  const caseDefinitions = document.querySelector('#caseDefinitions');
+  const runnerFailure = document.querySelector('#runnerFailure');
+  const runnerHumanReview = document.querySelector('#runnerHumanReview');
+  const confirmTestProposal = document.querySelector('#confirmTestProposal');
+  const rejectTestProposal = document.querySelector('#rejectTestProposal');
+  const testMemoryHeading = document.querySelector('#testMemoryHeading');
+  const testDbName = document.querySelector('#testDbName');
+  const testMemoryUser = document.querySelector('#testMemoryUser');
+  const testMemorySession = document.querySelector('#testMemorySession');
+  const testMemoryRevision = document.querySelector('#testMemoryRevision');
+  const testMemoryStatus = document.querySelector('#testMemoryStatus');
+  const testMemoryList = document.querySelector('#testMemoryList');
+  const diagnosticCase = document.querySelector('#diagnosticCase');
+  const runDiagnosticButton = document.querySelector('#runDiagnostic');
+  const diagnosticCorrectButton = document.querySelector('#diagnosticCorrect');
+  const diagnosticIncorrectButton = document.querySelector('#diagnosticIncorrect');
+  const diagnosticCreateProposalButton = document.querySelector('#diagnosticCreateProposal');
+  const diagnosticLoadProposalButton = document.querySelector('#diagnosticLoadProposal');
+  const diagnosticConfirmProposalButton = document.querySelector('#diagnosticConfirmProposal');
+  const diagnosticJudgment = document.querySelector('#diagnosticJudgment');
+  const benchmarkPreflightCase = document.querySelector('#benchmarkPreflightCase');
+  const runBenchmarkPreflightButton = document.querySelector('#runBenchmarkPreflight');
+  const benchmarkHeldoutConfirm = document.querySelector('#benchmarkHeldoutConfirm');
+  const runBenchmarkHeldoutStageButton = document.querySelector('#runBenchmarkHeldoutStage');
+  const shadowMessageInput = document.querySelector('#shadowMessage');
+  const runProductionShadowButton = document.querySelector('#runProductionShadow');
+  const shadowStatus = document.querySelector('#shadowStatus');
+  const shadowRevision = document.querySelector('#shadowRevision');
+  const shadowCoverage = document.querySelector('#shadowCoverage');
+  const shadowCutoverGate = document.querySelector('#shadowCutoverGate');
+  const shadowResult = document.querySelector('#shadowResult');
+  const createHrP3ProposalButton = document.querySelector('#createHrP3Proposal');
+  const hrP3ProposalResult = document.querySelector('#hrP3ProposalResult');
+  const refreshLegacyInventoryButton = document.querySelector('#refreshLegacyInventory');
+  const legacyInventorySummary = document.querySelector('#legacyInventorySummary');
+  const legacyMemorySelect = document.querySelector('#legacyMemorySelect');
+  const legacySlotSelect = document.querySelector('#legacySlotSelect');
+  const legacyCanonicalValue = document.querySelector('#legacyCanonicalValue');
+  const previewLegacyCutoverButton = document.querySelector('#previewLegacyCutover');
+  const confirmLegacyCutoverCheckbox = document.querySelector('#confirmLegacyCutover');
+  const applyLegacyCutoverButton = document.querySelector('#applyLegacyCutover');
+  const legacyCutoverResult = document.querySelector('#legacyCutoverResult');
+  const legacyCutoverApplyResult = document.querySelector('#legacyCutoverApplyResult');
+  let productStatus = null;
+  let benchmarkStatus = null;
+  let benchmarkPreflightInFlight = false;
+  let benchmarkHeldoutStatus = null;
+  let benchmarkHeldoutInFlight = false;
+  let sessionId = null;
+  let proposalId = null;
+  let proposalData = null;
+  let requestInFlight = false;
+  let requestGeneration = 0;
+  let contextGeneration = 0;
+  let imeComposing = false;
+  let testJobRunning = false;
+  let testJobId = null;
+  let testCatalog = null;
+  let failureSoundPlayedForJob = null;
+  let testAudioContext = null;
+  let currentHumanReview = null;
+  let reviewActionInFlight = false;
+  let diagnosticCatalog = [];
+  let diagnosticInFlight = false;
+  let diagnosticGeneration = 0;
+  let diagnosticResult = null;
+  let diagnosticProposalInFlight = false;
+  let diagnosticReviewActionInFlight = false;
+  let diagnosticPageCalls = 0;
+  let productionShadowInFlight = false;
+  let hrP3ReviewToken = null;
+  let hrP3ProposalInFlight = false;
+  let legacyInventory = null;
+  let legacyCutoverInFlight = false;
+  let legacyCutoverReviewToken = null;
+  const sessionsByUser = new Map();
+
+  async function resumePendingSession(userId) {
+    const data = await apiGet(`/api/pending-session?user_id=${encodeURIComponent(userId)}`);
+    if (!data || !data.resumed_pending) return false;
+    renderSession(data);
+    return true;
+  }
+
+  async function api(path, body) {
+    const response = await fetch(path, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    return data;
+  }
+  async function apiGet(path) {
+    const response = await fetch(path);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    return data;
+  }
+  function renderMemories(items) {
+    memories.replaceChildren();
+    for (const item of items.length ? items : ['No saved memories']) {
+      const li = document.createElement('li'); li.textContent = item; memories.append(li);
+    }
+  }
+  function addMessage(role, text) {
+    const div = document.createElement('div'); div.className = `message ${role}`; div.textContent = text; chat.append(div); chat.scrollTop = chat.scrollHeight;
+  }
+  function syncChatControls() {
+    const blocked = Boolean(proposalId) || requestInFlight || testJobRunning;
+    messageInput.disabled = blocked;
+    sendButton.disabled = blocked;
+    userSelect.disabled = requestInFlight || testJobRunning;
+    newSessionButton.disabled = requestInFlight || testJobRunning;
+    clearDataButton.disabled = requestInFlight || testJobRunning;
+    confirmProposalButton.disabled = requestInFlight || testJobRunning;
+    correctProposalButton.disabled = requestInFlight || testJobRunning;
+    cancelProposalButton.disabled = requestInFlight || testJobRunning;
+    submitCorrectionButton.disabled = requestInFlight || testJobRunning;
+    closeCorrectionButton.disabled = requestInFlight || testJobRunning;
+    for (const control of proposalCorrectionFields.querySelectorAll('input, select')) control.disabled = requestInFlight || testJobRunning;
+    for (const button of suiteButtons) button.disabled = !testCatalog || requestInFlight || testJobRunning;
+  }
+  function beginRequest(userId = userSelect.value, targetSessionId = sessionId, targetProposalId = proposalId) {
+    if (requestInFlight) return null;
+    requestInFlight = true;
+    const context = {
+      userId,
+      sessionId: targetSessionId,
+      proposalId: targetProposalId,
+      requestToken: ++requestGeneration,
+      contextToken: contextGeneration,
+    };
+    syncChatControls();
+    return context;
+  }
+  function requestIsCurrent(context, includeProposal = false) {
+    return context.requestToken === requestGeneration
+      && context.contextToken === contextGeneration
+      && context.userId === userSelect.value
+      && context.sessionId === sessionId
+      && (!includeProposal || context.proposalId === proposalId);
+  }
+  function navigationIsCurrent(context) {
+    return context.requestToken === requestGeneration
+      && context.contextToken === contextGeneration
+      && context.userId === userSelect.value
+      && (context.sessionId === null || sessionsByUser.get(context.userId) === context.sessionId);
+  }
+  function finishRequest(context) {
+    if (context.requestToken !== requestGeneration) return;
+    requestInFlight = false;
+    syncChatControls();
+  }
+  function renderProposal(item) {
+    const isSemantic = Boolean(item && item.semantic_confirmation);
+    proposalData = item;
+    proposalId = item ? item.proposal_id : null;
+    proposalText.textContent = item ? item.display_text : '';
+    proposalState.textContent = item ? 'Pending confirmation' : '';
+    proposalState.hidden = !isSemantic;
+    legacyProposalHeading.hidden = isSemantic;
+    semanticProposalHeading.hidden = !isSemantic;
+    proposalDestructive.hidden = !(item && item.destructive);
+    correctProposalButton.hidden = !(isSemantic && item.correctable);
+    proposalCorrection.hidden = true;
+    proposalCorrectionFields.replaceChildren();
+    proposalBox.hidden = !item;
+    syncChatControls();
+  }
+  function renderClarification(item) {
+    clarificationText.textContent = item ? item.display_text : '';
+    clarificationBox.hidden = !item;
+  }
+  function renderSession(data) {
+    contextGeneration += 1;
+    sessionId = data.session_id;
+    sessionsByUser.set(data.user_id, sessionId);
+    chat.replaceChildren();
+    for (const item of data.messages || []) addMessage(item.role, item.content);
+    renderMemories(data.memories);
+    normalMemoryHeading.textContent = `Normal Chat Memory (${data.normal_db_name || 'Unknown database'})`;
+    renderProposal(data.proposal);
+    renderClarification(data.clarification);
+    sessionLabel.textContent = `${data.user_id} · session ${sessionId}`;
+    status.textContent = '';
+  }
+  async function loadState() {
+    if (!sessionId) return;
+    const requestUserId = userSelect.value;
+    const requestSessionId = sessionId;
+    const data = await apiGet(`/api/state?user_id=${encodeURIComponent(requestUserId)}&session_id=${encodeURIComponent(requestSessionId)}`);
+    if (requestUserId !== userSelect.value || requestSessionId !== sessionId) return;
+    renderSession(data);
+  }
+  async function newSession() {
+    const requestUserId = userSelect.value;
+    const context = beginRequest(requestUserId, null, null);
+    if (!context) return;
+    status.textContent = '';
+    try {
+      const data = await api('/api/session', {user_id: requestUserId});
+      if (!navigationIsCurrent(context)) return;
+      renderSession({...data, messages: []});
+    } catch (error) {
+      if (navigationIsCurrent(context)) status.textContent = error.message;
+    } finally { finishRequest(context); }
+  }
+  async function switchUserSession() {
+    if (requestInFlight) return;
+    status.textContent = '';
+    const requestUserId = userSelect.value;
+    const saved = sessionsByUser.get(requestUserId);
+    if (!saved) {
+      try {
+        if (await resumePendingSession(requestUserId)) return;
+      } catch (error) {
+        status.textContent = error.message;
+        return;
+      }
+      await newSession();
+      return;
+    }
+    const context = beginRequest(requestUserId, saved, null);
+    if (!context) return;
+    try {
+      const data = await apiGet(`/api/state?user_id=${encodeURIComponent(requestUserId)}&session_id=${encodeURIComponent(saved)}`);
+      if (!navigationIsCurrent(context)) return;
+      renderSession(data);
+    } catch (error) {
+      if (navigationIsCurrent(context)) status.textContent = error.message;
+    } finally { finishRequest(context); }
+  }
+  newSessionButton.addEventListener('click', newSession);
+  userSelect.addEventListener('change', switchUserSession);
+  clearDataButton.addEventListener('click', async () => {
+    if (requestInFlight) return;
+    const requestUserId = userSelect.value;
+    const requestSessionId = sessionId;
+    if (!confirm(`Clear all conversations and long-term memories for ${requestUserId}?`)) return;
+    const context = beginRequest(requestUserId, requestSessionId, proposalId);
+    if (!context) return;
+    try {
+      await api('/api/clear', {user_id: requestUserId});
+      if (!requestIsCurrent(context)) return;
+      sessionsByUser.delete(requestUserId);
+      const data = await api('/api/session', {user_id: requestUserId});
+      if (!requestIsCurrent(context)) return;
+      renderSession({...data, messages: []});
+    } catch (error) {
+      if (requestIsCurrent(context)) status.textContent = error.message;
+    } finally { finishRequest(context); }
+  });
+  async function resolveProposal(action) {
+    if (!sessionId || !proposalId || requestInFlight) return;
+    const requestUserId = userSelect.value;
+    const requestSessionId = sessionId;
+    const requestProposalId = proposalId;
+    const context = beginRequest(requestUserId, requestSessionId, requestProposalId);
+    if (!context) return;
+    status.textContent = '';
+    proposalState.textContent = `${action === 'confirm' ? 'Confirm' : 'Cancel'} in progress…`;
+    try {
+      const data = await api(`/api/proposal/${action}`, {user_id: requestUserId, session_id: requestSessionId, proposal_id: requestProposalId});
+      if (!requestIsCurrent(context, true)) return;
+      addMessage('assistant', data.reply); renderMemories(data.memories); renderProposal(data.proposal); renderClarification(data.clarification);
+    } catch (error) {
+      if (requestIsCurrent(context, true)) {
+        proposalState.textContent = `${action === 'confirm' ? 'Confirm' : 'Cancel'} failed: ${error.message}`;
+        proposalState.hidden = false;
+        status.textContent = error.message;
+      }
+    } finally { finishRequest(context); }
+  }
+  confirmProposalButton.addEventListener('click', () => resolveProposal('confirm'));
+  cancelProposalButton.addEventListener('click', () => resolveProposal('cancel'));
+  function correctionControl(field, value) {
+    const label = document.createElement('label');
+    label.textContent = field === 'semantic_key' ? 'Memory key' : field === 'display_label' ? 'Display label' : field === 'item' ? 'Set item' : 'Value';
+    let control;
+    if (typeof value === 'boolean') {
+      control = document.createElement('select');
+      for (const optionValue of ['true', 'false']) {
+        const option = document.createElement('option'); option.value = optionValue; option.textContent = optionValue; control.append(option);
+      }
+      control.value = String(value);
+    } else {
+      control = document.createElement('input');
+      control.type = typeof value === 'number' ? 'number' : 'text';
+      control.value = value == null ? '' : String(value);
+    }
+    control.dataset.correctionField = field;
+    control.dataset.valueType = value === null ? 'null' : typeof value;
+    label.append(control);
+    return label;
+  }
+  function openCorrectionEditor() {
+    if (!proposalData || !proposalData.correctable || requestInFlight) return;
+    const correction = proposalData.correction;
+    proposalCorrectionFields.replaceChildren();
+    for (const field of correction.editable_fields) {
+      const value = field === 'semantic_key' || field === 'display_label' ? correction[field] : correction.arguments[field];
+      proposalCorrectionFields.append(correctionControl(field, value));
+    }
+    proposalCorrection.hidden = false;
+    syncChatControls();
+  }
+  function correctedValue(control) {
+    if (control.dataset.valueType === 'number') return Number(control.value);
+    if (control.dataset.valueType === 'boolean') return control.value === 'true';
+    return control.value;
+  }
+  async function submitCorrection() {
+    if (!sessionId || !proposalId || !proposalData || !proposalData.correctable || requestInFlight) return;
+    const requestUserId = userSelect.value;
+    const requestSessionId = sessionId;
+    const requestProposalId = proposalId;
+    const correction = {arguments: JSON.parse(JSON.stringify(proposalData.correction.arguments))};
+    for (const control of proposalCorrectionFields.querySelectorAll('[data-correction-field]')) {
+      const field = control.dataset.correctionField;
+      if (field === 'semantic_key' || field === 'display_label') correction[field] = correctedValue(control);
+      else correction.arguments[field] = correctedValue(control);
+    }
+    const context = beginRequest(requestUserId, requestSessionId, requestProposalId);
+    if (!context) return;
+    status.textContent = '';
+    proposalState.textContent = 'Correction in progress…';
+    try {
+      const data = await api('/api/proposal/correct', {user_id: requestUserId, session_id: requestSessionId, proposal_id: requestProposalId, correction});
+      if (!requestIsCurrent(context, true)) return;
+      addMessage('assistant', data.reply); renderMemories(data.memories); renderProposal(data.proposal); renderClarification(data.clarification);
+    } catch (error) {
+      if (requestIsCurrent(context, true)) {
+        proposalState.textContent = `Correction failed: ${error.message}`;
+        proposalState.hidden = false;
+        status.textContent = error.message;
+      }
+    } finally { finishRequest(context); }
+  }
+  correctProposalButton.addEventListener('click', openCorrectionEditor);
+  closeCorrectionButton.addEventListener('click', () => { proposalCorrection.hidden = true; });
+  submitCorrectionButton.addEventListener('click', submitCorrection);
+  async function sendMessage() {
+    if (!sessionId || proposalId || requestInFlight || testJobRunning || messageInput.disabled) return;
+    const message = messageInput.value.trim(); if (!message) return;
+    const requestUserId = userSelect.value;
+    const requestSessionId = sessionId;
+    const context = beginRequest(requestUserId, requestSessionId, null);
+    if (!context) return;
+    status.textContent = 'Waiting for DeepSeek…';
+    try {
+      const data = await api('/api/chat', {user_id: requestUserId, session_id: requestSessionId, message, api_key: document.querySelector('#apiKey').value || undefined});
+      if (!requestIsCurrent(context)) return;
+      addMessage('user', message); messageInput.value = '';
+      addMessage('assistant', data.reply); renderMemories(data.memories); renderProposal(data.proposal); renderClarification(data.clarification); status.textContent = '';
+    } catch (error) {
+      if (requestIsCurrent(context)) status.textContent = error.message + ' Stored memories were preserved.';
+    } finally { finishRequest(context); }
+  }
+  chatForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    sendMessage();
+  });
+  messageInput.addEventListener('compositionstart', () => { imeComposing = true; });
+  messageInput.addEventListener('compositionend', () => { imeComposing = false; });
+  messageInput.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' || event.shiftKey) return;
+    if (event.isComposing || imeComposing || event.keyCode === 229) return;
+    event.preventDefault();
+    sendMessage();
+  });
+  function initializeFailureAudio() {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    if (!testAudioContext) testAudioContext = new AudioContextClass();
+    if (testAudioContext.state === 'suspended') testAudioContext.resume().catch(() => {});
+  }
+  function playThreeFailureBeeps() {
+    if (!testAudioContext) return;
+    const start = testAudioContext.currentTime + 0.03;
+    for (let i = 0; i < 3; i++) {
+      const oscillator = testAudioContext.createOscillator();
+      const gain = testAudioContext.createGain();
+      const toneStart = start + i * 0.34;
+      oscillator.frequency.value = 987.77;
+      oscillator.type = 'sine';
+      gain.gain.setValueAtTime(0.0001, toneStart);
+      gain.gain.exponentialRampToValueAtTime(0.18, toneStart + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, toneStart + 0.22);
+      oscillator.connect(gain); gain.connect(testAudioContext.destination);
+      oscillator.start(toneStart); oscillator.stop(toneStart + 0.22);
+    }
+  }
+  function renderCaseDefinitions() {
+    if (!testCatalog) return;
+    caseDefinitions.replaceChildren();
+    for (const item of testCatalog.cases[caseSuiteSelect.value] || []) {
+      const row = document.createElement('div'); row.className = 'case-definition';
+      const heading = document.createElement('strong'); heading.textContent = `${item.case_id} — ${item.title}`;
+      const body = document.createElement('div');
+      body.textContent = `Type: ${item.test_type} | Acceptance: ${item.acceptance_level}\nQuestion: ${item.question}\nExpected answer: ${item.expected_answer}\nExpected state: ${item.expected_state}`;
+      body.style.whiteSpace = 'pre-wrap'; row.append(heading, body); caseDefinitions.append(row);
+    }
+  }
+  function renderTestJob(job) {
+    const item = job.current_case || {};
+    const last = job.last_result || {};
+    runnerStatus.dataset.state = job.status;
+    document.querySelector('#runnerSuite').textContent = job.suite_id || '—';
+    document.querySelector('#runnerProtocol').textContent = job.protocol || '—';
+    document.querySelector('#runnerProvider').textContent = job.provider || '—';
+    document.querySelector('#runnerState').textContent = job.status;
+    document.querySelector('#runnerProgress').textContent = `${job.progress} / ${job.total}`;
+    document.querySelector('#runnerElapsed').textContent = `${Number(job.elapsed_seconds || 0).toFixed(1)} s`;
+    document.querySelector('#runnerPassed').textContent = job.passed_count;
+    document.querySelector('#runnerDegraded').textContent = job.safe_degrade_count;
+    document.querySelector('#runnerCalls').textContent = job.provider_calls;
+    document.querySelector('#runnerReviewed').textContent = job.human_reviewed_writes || 0;
+    document.querySelector('#runnerConfirmed').textContent = job.confirmed_count || 0;
+    document.querySelector('#runnerRejected').textContent = job.rejected_count || 0;
+    document.querySelector('#runnerProposalCheck').textContent = last.proposal_status || '—';
+    document.querySelector('#runnerAutoConfirm').textContent = last.auto_confirm_status || '—';
+    document.querySelector('#runnerAcceptance').textContent = item.acceptance_level || '—';
+    document.querySelector('#runnerCase').textContent = item.case_id ? `${item.case_id} — ${item.title}` : '—';
+    document.querySelector('#runnerType').textContent = item.test_type || '—';
+    document.querySelector('#runnerQuestion').textContent = item.question || '—';
+    document.querySelector('#runnerExpected').textContent = item.expected_answer || '—';
+    document.querySelector('#runnerActual').textContent = last.actual_answer || '—';
+    const checks = last.checks || {};
+    document.querySelector('#runnerChecks').textContent = Object.entries(checks).map(([name, value]) => `${name}: ${value}`).join(' | ') || '—';
+    document.querySelector('#runnerDiagnosticStages').textContent = (last.diagnostic_stages || job.diagnostic_stages || []).join(' → ') || '—';
+    currentHumanReview = job.status === 'WAITING_FOR_HUMAN_REVIEW' ? job.human_review : null;
+    runnerHumanReview.hidden = !currentHumanReview;
+    if (currentHumanReview) {
+      const review = currentHumanReview;
+      document.querySelector('#reviewCaseId').textContent = review.case_id;
+      document.querySelector('#reviewQuestion').textContent = review.question;
+      document.querySelector('#reviewExpected').textContent = review.expected_semantic_meaning;
+      document.querySelector('#reviewRendered').textContent = review.rendered_proposal;
+      document.querySelector('#reviewStateType').textContent = review.state_type;
+      document.querySelector('#reviewOperation').textContent = review.operation;
+      document.querySelector('#reviewSubject').textContent = review.subject;
+      document.querySelector('#reviewValue').textContent = Object.entries(review.proposed_value || {}).map(([name, value]) => `${name}: ${Array.isArray(value) ? value.join(', ') : value}`).join(' | ') || '—';
+      document.querySelector('#reviewDestructive').textContent = review.destructive ? 'Yes' : 'No';
+      document.querySelector('#reviewRevision').textContent = review.current_revision;
+      document.querySelector('#reviewProviderCalls').textContent = review.provider_calls;
+    }
+    confirmTestProposal.disabled = !currentHumanReview || reviewActionInFlight;
+    rejectTestProposal.disabled = !currentHumanReview || reviewActionInFlight;
+    const dbName = job.test_db_name || 'No test suite selected';
+    testMemoryHeading.textContent = job.test_db_name ? `Automated Test Memory (${dbName})` : 'Automated Test Memory';
+    testDbName.textContent = dbName;
+    testMemoryUser.textContent = job.test_user_id || '—';
+    testMemorySession.textContent = job.test_session_id ? String(job.test_session_id).slice(0, 18) : '—';
+    testMemoryRevision.textContent = job.test_revision ?? '—';
+    testMemoryList.replaceChildren();
+    if (job.failure?.failure_type === 'TEST DATABASE SAFETY BLOCKED') {
+      testMemoryStatus.textContent = 'TEST DATABASE SAFETY BLOCKED';
+    } else if (job.failure?.failure_type === 'TEST DATABASE RESET FAILED') {
+      testMemoryStatus.textContent = 'TEST DATABASE RESET FAILED';
+    } else if (job.status === 'CLEARING DB') {
+      testMemoryStatus.textContent = 'Resetting test database...';
+    } else if ((job.test_memories || []).length === 0) {
+      testMemoryStatus.textContent = 'No saved test memories';
+    } else {
+      testMemoryStatus.textContent = '';
+      for (const memory of job.test_memories) {
+        const li = document.createElement('li'); li.textContent = memory; testMemoryList.append(li);
+      }
+    }
+    runnerFailure.hidden = !job.failure;
+    if (job.failure) {
+      const f = job.failure;
+      runnerFailure.textContent = `FAILURE TYPE: ${f.failure_type}\nCASE ID: ${f.case_id || '—'}\nSTEP: ${f.step || '—'}\nQUESTION: ${f.question || '—'}\nEXPECTED: ${f.expected || '—'}\nACTUAL: ${f.actual || '—'}\nEXPECTED STATE: ${f.expected_state || '—'}\nACTUAL STATE: ${JSON.stringify(f.actual_state)}\nDIAGNOSTIC / EXCEPTION: ${f.diagnostic || '—'}\nREVISION BEFORE: ${f.revision_before ?? '—'}\nREVISION AFTER: ${f.revision_after ?? '—'}\nPROVIDER CALL COUNT: ${f.provider_call_count}`;
+    }
+  }
+  async function pollTestJob() {
+    if (!testJobId) return;
+    try {
+      const job = await apiGet(`/api/test-suite/status?id=${encodeURIComponent(testJobId)}`);
+      renderTestJob(job);
+      if (job.status === 'CLEARING DB' || job.status === 'RUNNING' || job.status === 'WAITING_FOR_HUMAN_REVIEW') {
+        window.setTimeout(pollTestJob, 500);
+      } else {
+        testJobRunning = false; syncChatControls();
+        if (job.status === 'FAIL' && failureSoundPlayedForJob !== job.job_id) {
+          failureSoundPlayedForJob = job.job_id; playThreeFailureBeeps();
+        }
+      }
+    } catch (error) {
+      testJobRunning = false; syncChatControls();
+      runnerStatus.dataset.state = 'FAIL'; document.querySelector('#runnerState').textContent = 'FAIL';
+      runnerFailure.hidden = false; runnerFailure.textContent = `STATUS POLL FAILED\n${error.message}`;
+      if (failureSoundPlayedForJob !== testJobId) { failureSoundPlayedForJob = testJobId; playThreeFailureBeeps(); }
+    }
+  }
+  async function submitHumanReview(action) {
+    if (!currentHumanReview || reviewActionInFlight || !testJobId) return;
+    reviewActionInFlight = true;
+    confirmTestProposal.disabled = true; rejectTestProposal.disabled = true;
+    const review = currentHumanReview;
+    try {
+      const job = await api('/api/test-suite/review', {
+        job_id: testJobId,
+        case_id: review.case_id,
+        proposal_id: review.proposal_id,
+        session_id: review.session_id,
+        action,
+      });
+      renderTestJob(job);
+    } catch (error) {
+      runnerFailure.hidden = false;
+      runnerFailure.textContent = `HUMAN REVIEW ACTION FAILED\n${error.message}`;
+    } finally {
+      reviewActionInFlight = false;
+      confirmTestProposal.disabled = !currentHumanReview;
+      rejectTestProposal.disabled = !currentHumanReview;
+    }
+  }
+  confirmTestProposal.addEventListener('click', () => submitHumanReview('confirm'));
+  rejectTestProposal.addEventListener('click', () => submitHumanReview('reject'));
+  async function startTestSuite(suiteId) {
+    if (testJobRunning || requestInFlight) return;
+    initializeFailureAudio();
+    const suiteMetadata = (testCatalog?.suites || []).find((item) => item.suite_id === suiteId);
+    if (!suiteMetadata) return;
+    testMemoryHeading.textContent = `Automated Test Memory (${suiteMetadata.test_db_name})`;
+    testDbName.textContent = suiteMetadata.test_db_name;
+    testMemoryUser.textContent = '—'; testMemorySession.textContent = '—'; testMemoryRevision.textContent = '—';
+    testMemoryList.replaceChildren(); testMemoryStatus.textContent = 'Resetting test database...';
+    const paid = Boolean(suiteMetadata.paid);
+    if (paid && !confirm('This test uses the real DeepSeek API and may incur API cost. The runner stops on first failure. Production memory.db will NOT be cleared or modified. Continue?')) return;
+    testJobRunning = true; syncChatControls(); runnerFailure.hidden = true;
+    try {
+      const job = await api('/api/test-suite/start', {suite_id: suiteId, confirmed: paid, api_key: document.querySelector('#apiKey').value || undefined});
+      testJobId = job.job_id; renderTestJob(job); pollTestJob();
+    } catch (error) {
+      testJobRunning = false; syncChatControls();
+      runnerStatus.dataset.state = 'FAIL'; document.querySelector('#runnerState').textContent = 'FAIL';
+      runnerFailure.hidden = false; runnerFailure.textContent = `TEST DATABASE RESET/START FAILED\n${error.message}`;
+      playThreeFailureBeeps();
+    }
+  }
+  for (const button of suiteButtons) button.addEventListener('click', () => startTestSuite(button.dataset.suite));
+  caseSuiteSelect.addEventListener('change', renderCaseDefinitions);
+  function selectedDiagnosticCase() {
+    return diagnosticCatalog.find((item) => item.case_id === diagnosticCase.value) || null;
+  }
+  function diagnosticCaseSupportsReview(item = selectedDiagnosticCase()) {
+    return Boolean(item?.review_persistence_supported);
+  }
+  function resetDiagnosticResult() {
+    diagnosticGeneration += 1;
+    diagnosticResult = null;
+    const item = selectedDiagnosticCase();
+    document.querySelector('#diagnosticCaseId').textContent = item?.case_id || '—';
+    document.querySelector('#diagnosticQuestion').textContent = item?.question || '—';
+    document.querySelector('#diagnosticExpected').textContent = item?.expected_semantic_meaning || '—';
+    document.querySelector('#diagnosticState').textContent = 'IDLE';
+    document.querySelector('#diagnosticRunCalls').textContent = '0';
+    document.querySelector('#diagnosticModel').textContent = '—';
+    document.querySelector('#diagnosticApplication').textContent = '—';
+    document.querySelector('#diagnosticOperands').textContent = '—';
+    document.querySelector('#diagnosticCompiler').textContent = '—';
+    document.querySelector('#diagnosticPrecondition').textContent = '—';
+    document.querySelector('#diagnosticRisk').textContent = '—';
+    document.querySelector('#diagnosticRouting').textContent = '—';
+    document.querySelector('#diagnosticHumanReviewPayload').textContent = '—';
+    document.querySelector('#diagnosticPersistedProposal').textContent = '—';
+    document.querySelector('#diagnosticConfirmResult').textContent = '—';
+    document.querySelector('#diagnosticRaw').textContent = '—';
+    document.querySelector('#diagnosticGrounding').textContent = '—';
+    document.querySelector('#diagnosticReason').textContent = '—';
+    diagnosticJudgment.dataset.value = '';
+    diagnosticJudgment.textContent = 'Manual semantic judgment: NOT RECORDED';
+    diagnosticCorrectButton.disabled = true;
+    diagnosticIncorrectButton.disabled = true;
+    diagnosticCreateProposalButton.disabled = true;
+    diagnosticConfirmProposalButton.disabled = true;
+    diagnosticLoadProposalButton.disabled = !diagnosticCaseSupportsReview(item);
+  }
+  function renderDiagnosticResult(data) {
+    diagnosticResult = data;
+    document.querySelector('#diagnosticCaseId').textContent = data.case_id;
+    document.querySelector('#diagnosticQuestion').textContent = data.question;
+    document.querySelector('#diagnosticExpected').textContent = data.expected_semantic_meaning;
+    document.querySelector('#diagnosticState').textContent = data.state;
+    document.querySelector('#diagnosticRunCalls').textContent = data.provider_calls_this_run;
+    document.querySelector('#diagnosticTotalCalls').textContent = diagnosticPageCalls;
+    document.querySelector('#diagnosticModel').textContent = JSON.stringify(data.model_selection, null, 2);
+    document.querySelector('#diagnosticApplication').textContent = JSON.stringify(data.application_derivation, null, 2);
+    document.querySelector('#diagnosticOperands').textContent = JSON.stringify(data.grounded_operands, null, 2);
+    document.querySelector('#diagnosticCompiler').textContent = JSON.stringify(data.compiler_preview, null, 2);
+    document.querySelector('#diagnosticPrecondition').textContent = JSON.stringify(data.precondition_preview, null, 2);
+    document.querySelector('#diagnosticRisk').textContent = JSON.stringify(data.risk_preview, null, 2);
+    document.querySelector('#diagnosticRouting').textContent = JSON.stringify(data.routing_preview, null, 2);
+    document.querySelector('#diagnosticHumanReviewPayload').textContent = JSON.stringify(data.human_review_payload_preview, null, 2);
+    document.querySelector('#diagnosticRaw').textContent = typeof data.raw_model_result === 'string' ? data.raw_model_result : JSON.stringify(data.raw_model_result, null, 2);
+    document.querySelector('#diagnosticGrounding').textContent = data.grounding_status;
+    document.querySelector('#diagnosticReason').textContent = data.diagnostic;
+    const mutation = data.zero_persistence;
+    document.querySelector('#diagnosticMutation').textContent = `Current changed: ${mutation.current_changed} | History changed: ${mutation.history_changed} | Revision changed: ${mutation.revision_changed} | Proposal created: ${mutation.proposal_created}`;
+    const canJudge = data.state === 'VALIDATED';
+    diagnosticCorrectButton.disabled = !canJudge;
+    diagnosticIncorrectButton.disabled = !canJudge;
+    const canPersistProposal = canJudge && data.run_id && data.routing_preview?.route === 'HUMAN_REVIEW_ROUTE' && data.routing_preview?.proposal_required === true;
+    diagnosticCreateProposalButton.disabled = !canPersistProposal;
+    diagnosticLoadProposalButton.disabled = !diagnosticCaseSupportsReview();
+    diagnosticConfirmProposalButton.disabled = true;
+  }
+  async function runOntologyDiagnostic() {
+    if (diagnosticInFlight || !selectedDiagnosticCase()) return;
+    diagnosticInFlight = true;
+    runDiagnosticButton.disabled = true;
+    diagnosticCorrectButton.disabled = true;
+    diagnosticIncorrectButton.disabled = true;
+    diagnosticCreateProposalButton.disabled = true;
+    diagnosticConfirmProposalButton.disabled = true;
+    const caseId = diagnosticCase.value;
+    const generation = ++diagnosticGeneration;
+    document.querySelector('#diagnosticState').textContent = 'RUNNING';
+    try {
+      const data = await api('/api/ontology-diagnostic/extract', {case_id: caseId, api_key: document.querySelector('#apiKey').value || undefined});
+      diagnosticPageCalls += Number(data.provider_calls_this_run || 0);
+      document.querySelector('#diagnosticTotalCalls').textContent = diagnosticPageCalls;
+      if (generation !== diagnosticGeneration || diagnosticCase.value !== caseId) return;
+      renderDiagnosticResult(data);
+    } catch (error) {
+      if (generation === diagnosticGeneration && diagnosticCase.value === caseId) {
+        document.querySelector('#diagnosticState').textContent = 'PROVIDER_ERROR';
+        document.querySelector('#diagnosticReason').textContent = error.message;
+      }
+    } finally {
+      diagnosticInFlight = false;
+      runDiagnosticButton.disabled = !selectedDiagnosticCase();
+    }
+  }
+  async function createIsolatedDiagnosticProposal() {
+    if (diagnosticProposalInFlight || !diagnosticResult || diagnosticResult.state !== 'VALIDATED' || !diagnosticResult.run_id) return;
+    if (diagnosticResult.routing_preview?.route !== 'HUMAN_REVIEW_ROUTE') return;
+    diagnosticProposalInFlight = true;
+    diagnosticCreateProposalButton.disabled = true;
+    try {
+      const result = await api('/api/ontology-diagnostic/proposal/create', {run_id: diagnosticResult.run_id});
+      document.querySelector('#diagnosticPersistedProposal').textContent = JSON.stringify(result, null, 2);
+      diagnosticConfirmProposalButton.disabled = !result.proposal_created;
+      const mutation = diagnosticResult.zero_persistence;
+      document.querySelector('#diagnosticMutation').textContent = `Current changed: ${result.current_changed ? 'YES' : mutation.current_changed} | History changed: ${result.history_changed ? 'YES' : mutation.history_changed} | Revision changed: ${result.revision_changed ? 'YES' : mutation.revision_changed} | Proposal created: ${result.proposal_created ? 'YES (isolated diagnostic DB)' : mutation.proposal_created}`;
+    } catch (error) {
+      document.querySelector('#diagnosticPersistedProposal').textContent = `ERROR: ${error.message}`;
+      diagnosticCreateProposalButton.disabled = false;
+    } finally {
+      diagnosticProposalInFlight = false;
+    }
+  }
+  async function loadIsolatedDiagnosticProposal() {
+    const item = selectedDiagnosticCase();
+    if (diagnosticReviewActionInFlight || !diagnosticCaseSupportsReview(item)) return;
+    diagnosticReviewActionInFlight = true;
+    diagnosticLoadProposalButton.disabled = true;
+    diagnosticConfirmProposalButton.disabled = true;
+    try {
+      const result = await api('/api/ontology-diagnostic/proposal/status', {case_id: item.case_id});
+      document.querySelector('#diagnosticPersistedProposal').textContent = JSON.stringify(result, null, 2);
+      diagnosticConfirmProposalButton.disabled = !result.pending;
+    } catch (error) {
+      document.querySelector('#diagnosticPersistedProposal').textContent = `ERROR: ${error.message}`;
+    } finally {
+      diagnosticReviewActionInFlight = false;
+      diagnosticLoadProposalButton.disabled = !diagnosticCaseSupportsReview();
+    }
+  }
+  async function confirmIsolatedDiagnosticProposal() {
+    const item = selectedDiagnosticCase();
+    if (diagnosticReviewActionInFlight || !diagnosticCaseSupportsReview(item)) return;
+    diagnosticReviewActionInFlight = true;
+    diagnosticConfirmProposalButton.disabled = true;
+    diagnosticCreateProposalButton.disabled = true;
+    try {
+      const result = await api('/api/ontology-diagnostic/proposal/confirm', {case_id: item.case_id});
+      document.querySelector('#diagnosticConfirmResult').textContent = JSON.stringify(result, null, 2);
+      document.querySelector('#diagnosticPersistedProposal').textContent = JSON.stringify({
+        isolated: true,
+        database: result.database,
+        case_id: result.case_id,
+        pending: false,
+        proposal: null,
+        proposal_consumed: result.proposal_consumed,
+        provider_calls_added: result.provider_calls_added
+      }, null, 2);
+    } catch (error) {
+      document.querySelector('#diagnosticConfirmResult').textContent = `ERROR: ${error.message}`;
+      diagnosticConfirmProposalButton.disabled = false;
+    } finally {
+      diagnosticReviewActionInFlight = false;
+      diagnosticLoadProposalButton.disabled = !diagnosticCaseSupportsReview();
+    }
+  }
+  function recordDiagnosticJudgment(value) {
+    if (!diagnosticResult || diagnosticResult.state !== 'VALIDATED' || diagnosticInFlight) return;
+    diagnosticJudgment.dataset.value = value;
+    diagnosticJudgment.textContent = `Manual semantic judgment: ${value}`;
+  }
+  diagnosticCase.addEventListener('change', resetDiagnosticResult);
+  runDiagnosticButton.addEventListener('click', runOntologyDiagnostic);
+  diagnosticCorrectButton.addEventListener('click', () => recordDiagnosticJudgment('Semantic Correct'));
+  diagnosticIncorrectButton.addEventListener('click', () => recordDiagnosticJudgment('Semantic Incorrect'));
+  diagnosticCreateProposalButton.addEventListener('click', createIsolatedDiagnosticProposal);
+  diagnosticLoadProposalButton.addEventListener('click', loadIsolatedDiagnosticProposal);
+  diagnosticConfirmProposalButton.addEventListener('click', confirmIsolatedDiagnosticProposal);
+  apiGet('/api/test-suite/catalog').then((data) => { testCatalog = data; renderCaseDefinitions(); syncChatControls(); }).catch((error) => { runnerFailure.hidden = false; runnerFailure.textContent = error.message; });
+  apiGet('/api/ontology-diagnostic/extract').then((data) => {
+    diagnosticCatalog = data.cases || [];
+    diagnosticCase.replaceChildren();
+    for (const item of diagnosticCatalog) {
+      const option = document.createElement('option');
+      option.value = item.case_id; option.textContent = `${item.case_id} — ${item.title}`;
+      diagnosticCase.append(option);
+    }
+    diagnosticCase.disabled = diagnosticCatalog.length === 0;
+    runDiagnosticButton.disabled = diagnosticCatalog.length === 0;
+    resetDiagnosticResult();
+  }).catch((error) => {
+    document.querySelector('#diagnosticState').textContent = 'PROVIDER_ERROR';
+    document.querySelector('#diagnosticReason').textContent = error.message;
+  });
+
+  function renderProductStatus(data) {
+    productStatus = data;
+    const panel = document.querySelector('#productMode');
+    panel.dataset.autoStatus = data.automatic_semantic_memory || 'UNKNOWN';
+    document.querySelector('#productModeValue').textContent = data.product_mode || '—';
+    document.querySelector('#productAutomaticStatus').textContent = data.automatic_semantic_memory || '—';
+    document.querySelector('#productAutoCommit').textContent = data.production_auto_commit_enabled ? 'ENABLED' : 'DISABLED';
+    document.querySelector('#productHumanReview').textContent = data.human_reviewed_memory || '—';
+    document.querySelector('#productFreeze').textContent = data.freeze_id || '—';
+    document.querySelector('#productBenchmarkLock').textContent = data.automatic_benchmark_locked ? 'ARCHIVED / LOCKED' : 'OPEN';
+    if (data.automatic_benchmark_locked) document.querySelector('#benchmarkBatchEnabled').textContent = 'NO (ARCHIVED)';
+    document.querySelector('#productCutover').textContent = data.normal_chat_ontology_cutover || '—';
+    document.querySelector('#productStopEvidence').textContent = `STOP evidence: ${data.stop_case_id || '—'} at ordinal ${data.stop_ordinal ?? '—'}; held-out ${data.heldout_completed ?? '—'} / ${data.heldout_planned ?? '—'}.`;
+    if (data.automatic_benchmark_locked) {
+      benchmarkPreflightCase.disabled = true;
+      runBenchmarkPreflightButton.disabled = true;
+      benchmarkHeldoutConfirm.disabled = true;
+      runBenchmarkHeldoutStageButton.disabled = true;
+    }
+  }
+
+  function renderBenchmarkStatus(data) {
+    benchmarkStatus = data;
+    document.querySelector('#benchmarkFreezeStatus').textContent = data.status;
+    document.querySelector('#benchmarkFreezeId').textContent = data.freeze_id || '—';
+    document.querySelector('#benchmarkTurnCount').textContent = data.dataset_turns;
+    document.querySelector('#benchmarkAutoCount').textContent = data.auto_eligible_turns;
+    document.querySelector('#benchmarkGuardCount').textContent = data.guardrail_turns;
+    document.querySelector('#benchmarkBatchEnabled').textContent = data.heldout_batch_run_enabled ? 'YES' : 'NO';
+    document.querySelector('#benchmarkManifest').textContent = JSON.stringify({
+      procedure_version: data.procedure_version, dataset_version: data.dataset_version, model: data.model,
+      model_parameters: data.model_parameters, dataset_sha256: data.dataset_sha256, thresholds: data.thresholds,
+      stop_rule: data.stop_rule, drift: data.drift
+    }, null, 2);
+    benchmarkPreflightCase.replaceChildren();
+    for (const item of (data.preflight_cases || [])) {
+      const option = document.createElement('option');
+      option.value = item.case_id; option.textContent = `${item.case_id} — ${item.title}`;
+      benchmarkPreflightCase.append(option);
+    }
+    const archivedLock = Boolean(productStatus && productStatus.automatic_benchmark_locked);
+    const ready = !archivedLock && data.status === 'FROZEN' && (data.preflight_cases || []).length > 0;
+    benchmarkPreflightCase.disabled = !ready;
+    runBenchmarkPreflightButton.disabled = !ready;
+  }
+  async function runBenchmarkPreflight() {
+    if (benchmarkPreflightInFlight || !benchmarkStatus || benchmarkStatus.status !== 'FROZEN') return;
+    const caseId = benchmarkPreflightCase.value;
+    if (!caseId) return;
+    benchmarkPreflightInFlight = true;
+    runBenchmarkPreflightButton.disabled = true;
+    document.querySelector('#benchmarkPreflightState').textContent = 'RUNNING';
+    document.querySelector('#benchmarkPreflightResult').textContent = '—';
+    try {
+      const data = await api('/api/ontology-benchmark/preflight', {case_id: caseId, api_key: document.querySelector('#apiKey').value || undefined});
+      document.querySelector('#benchmarkPreflightState').textContent = data.evaluation?.state || 'UNKNOWN';
+      document.querySelector('#benchmarkPreflightCalls').textContent = data.provider_calls_this_run || 0;
+      document.querySelector('#benchmarkPreflightResult').textContent = JSON.stringify(data, null, 2);
+    } catch (error) {
+      document.querySelector('#benchmarkPreflightState').textContent = 'ERROR';
+      document.querySelector('#benchmarkPreflightResult').textContent = error.message;
+    } finally {
+      benchmarkPreflightInFlight = false;
+      runBenchmarkPreflightButton.disabled = !(benchmarkStatus && benchmarkStatus.status === 'FROZEN');
+    }
+  }
+  runBenchmarkPreflightButton.addEventListener('click', runBenchmarkPreflight);
+
+  function renderHeldoutStatus(data) {
+    benchmarkHeldoutStatus = data;
+    document.querySelector('#benchmarkHeldoutCompleted').textContent = `${data.completed_turns || 0} / ${data.dataset_turns || 660}`;
+    document.querySelector('#benchmarkHeldoutNextTarget').textContent = data.next_stage_target ?? 'COMPLETE';
+    document.querySelector('#benchmarkHeldoutNextCalls').textContent = data.next_stage_calls || 0;
+    document.querySelector('#benchmarkHeldoutLocked').textContent = data.run_locked ? 'YES' : 'NO';
+    document.querySelector('#benchmarkHeldoutResult').textContent = JSON.stringify({
+      official_heldout: data.official_heldout, freeze_id: data.freeze_id, procedure_version: data.procedure_version,
+      run_started: data.run_started, run_complete: data.run_complete, run_locked: data.run_locked,
+      partial_summary: data.partial_summary, failure_evidence: data.failure_evidence, final_summary: data.final_summary
+    }, null, 2);
+    const archivedLock = Boolean(productStatus && productStatus.automatic_benchmark_locked);
+    const ready = !archivedLock && data.status === 'FROZEN' && !data.run_locked && !data.run_complete && data.next_stage_target != null;
+    runBenchmarkHeldoutStageButton.disabled = !(ready && benchmarkHeldoutConfirm.checked) || benchmarkHeldoutInFlight;
+    if (data.run_started || archivedLock) benchmarkHeldoutConfirm.disabled = true;
+  }
+  async function refreshHeldoutStatus() {
+    const data = await apiGet('/api/ontology-benchmark/heldout-status');
+    renderHeldoutStatus(data);
+  }
+  benchmarkHeldoutConfirm.addEventListener('change', () => {
+    if (benchmarkHeldoutStatus) renderHeldoutStatus(benchmarkHeldoutStatus);
+  });
+  async function runBenchmarkHeldoutStage() {
+    if (benchmarkHeldoutInFlight || !benchmarkHeldoutStatus || benchmarkHeldoutStatus.run_locked || benchmarkHeldoutStatus.run_complete) return;
+    if (!benchmarkHeldoutConfirm.checked && !benchmarkHeldoutStatus.run_started) return;
+    benchmarkHeldoutInFlight = true;
+    runBenchmarkHeldoutStageButton.disabled = true;
+    document.querySelector('#benchmarkHeldoutResult').textContent = 'RUNNING OFFICIAL HELD-OUT STAGE — DO NOT RELOAD';
+    try {
+      const data = await api('/api/ontology-benchmark/heldout-next', {confirmed: true, api_key: document.querySelector('#apiKey').value || undefined});
+      document.querySelector('#benchmarkHeldoutResult').textContent = JSON.stringify(data, null, 2);
+      await refreshHeldoutStatus();
+    } catch (error) {
+      document.querySelector('#benchmarkHeldoutResult').textContent = error.message;
+      try { await refreshHeldoutStatus(); } catch (_) {}
+    } finally {
+      benchmarkHeldoutInFlight = false;
+      if (benchmarkHeldoutStatus) renderHeldoutStatus(benchmarkHeldoutStatus);
+    }
+  }
+  runBenchmarkHeldoutStageButton.addEventListener('click', runBenchmarkHeldoutStage);
+  runProductionShadowButton.addEventListener('click', async () => {
+    if (productionShadowInFlight || !sessionId || proposalId) return;
+    const message = shadowMessageInput.value.trim();
+    if (!message) { shadowStatus.textContent = 'MESSAGE REQUIRED'; return; }
+    productionShadowInFlight = true;
+    hrP3ReviewToken = null;
+    createHrP3ProposalButton.disabled = true;
+    hrP3ProposalResult.textContent = '—';
+    runProductionShadowButton.disabled = true;
+    shadowStatus.textContent = 'RUNNING';
+    shadowResult.textContent = 'RUNNING HR-P2 PRODUCTION SHADOW — DO NOT SEND/CONFIRM IN PARALLEL';
+    try {
+      const data = await api('/api/production-ontology-shadow', {
+        user_id: userSelect.value,
+        session_id: sessionId,
+        message,
+        api_key: document.querySelector('#apiKey').value || undefined,
+      });
+      shadowStatus.textContent = data.state || 'UNKNOWN';
+      shadowRevision.textContent = `${data.revision_before ?? data.normal_chat_revision ?? '—'} → ${data.revision_after ?? data.normal_chat_revision ?? '—'}`;
+      shadowCoverage.textContent = `${data.ontology_managed_current_count ?? 0} ontology / ${data.legacy_unmanaged_current_count ?? 0} legacy`;
+      shadowCutoverGate.textContent = data.cutover_gate || '—';
+      shadowResult.textContent = JSON.stringify(data, null, 2);
+      hrP3ReviewToken = data.hr_p3_review_available ? data.hr_p3_review_token : null;
+      createHrP3ProposalButton.disabled = !hrP3ReviewToken || Boolean(proposalId);
+    } catch (error) {
+      shadowStatus.textContent = 'ERROR';
+      shadowResult.textContent = `ERROR: ${error.message}`;
+    } finally {
+      productionShadowInFlight = false;
+      runProductionShadowButton.disabled = false;
+    }
+  });
+
+  createHrP3ProposalButton.addEventListener('click', async () => {
+    if (hrP3ProposalInFlight || !hrP3ReviewToken || proposalId) return;
+    hrP3ProposalInFlight = true;
+    createHrP3ProposalButton.disabled = true;
+    hrP3ProposalResult.textContent = 'CREATING REAL NORMAL CHAT HUMAN REVIEW PROPOSAL — NO CONFIRM';
+    let data = null;
+    try {
+      data = await api('/api/production-human-review/propose', {review_token: hrP3ReviewToken});
+      hrP3ReviewToken = null;
+      hrP3ProposalResult.textContent = JSON.stringify(data, null, 2);
+      if (data.proposal_view) renderProposal(data.proposal_view);
+    } catch (error) {
+      hrP3ReviewToken = null;
+      hrP3ProposalResult.textContent = `ERROR: ${error.message}`;
+      return;
+    } finally {
+      hrP3ProposalInFlight = false;
+      createHrP3ProposalButton.disabled = true;
+    }
+    try {
+      await loadState();
+    } catch (error) {
+      status.textContent = `Proposal was created, but the Normal Chat state refresh failed: ${error.message}`;
+    }
+  });
+
+  function renderLegacyInventory(data) {
+    legacyInventory = data;
+    legacyCutoverReviewToken = null;
+    confirmLegacyCutoverCheckbox.checked = false;
+    confirmLegacyCutoverCheckbox.disabled = true;
+    applyLegacyCutoverButton.disabled = true;
+    legacyCutoverApplyResult.textContent = '—';
+    legacyInventorySummary.textContent = `${data.ontology_managed_current_count ?? 0} ontology / ${data.legacy_unmanaged_current_count ?? 0} legacy · revision ${data.revision ?? '—'}`;
+    legacyMemorySelect.replaceChildren();
+    for (const row of data.legacy_rows || []) {
+      const option = document.createElement('option');
+      option.value = row.memory_id;
+      option.textContent = `${row.position}: ${row.content} [${row.memory_id}]`;
+      legacyMemorySelect.append(option);
+    }
+    if (!legacyMemorySelect.options.length) {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = 'No legacy Current rows';
+      legacyMemorySelect.append(option);
+    }
+    legacySlotSelect.replaceChildren();
+    for (const slot of data.eligible_slots || []) {
+      const option = document.createElement('option');
+      option.value = slot.slot_id;
+      option.textContent = `${slot.slot_id} — ${slot.display_label}`;
+      legacySlotSelect.append(option);
+    }
+    legacyCutoverResult.textContent = JSON.stringify(data, null, 2);
+  }
+
+  refreshLegacyInventoryButton.addEventListener('click', async () => {
+    if (legacyCutoverInFlight || !sessionId || proposalId) return;
+    legacyCutoverInFlight = true;
+    refreshLegacyInventoryButton.disabled = true;
+    previewLegacyCutoverButton.disabled = true;
+    legacyCutoverReviewToken = null;
+    confirmLegacyCutoverCheckbox.checked = false;
+    confirmLegacyCutoverCheckbox.disabled = true;
+    applyLegacyCutoverButton.disabled = true;
+    legacyCutoverApplyResult.textContent = '—';
+    legacyCutoverResult.textContent = 'LOADING REAL LEGACY CURRENT — READ ONLY';
+    try {
+      const data = await api('/api/legacy-cutover/inventory', {
+        user_id: userSelect.value,
+        session_id: sessionId,
+      });
+      renderLegacyInventory(data);
+    } catch (error) {
+      legacyInventorySummary.textContent = 'ERROR';
+      legacyCutoverResult.textContent = `ERROR: ${error.message}`;
+    } finally {
+      legacyCutoverInFlight = false;
+      refreshLegacyInventoryButton.disabled = false;
+      previewLegacyCutoverButton.disabled = false;
+    }
+  });
+
+  previewLegacyCutoverButton.addEventListener('click', async () => {
+    if (legacyCutoverInFlight || !sessionId || proposalId) return;
+    const memoryId = legacyMemorySelect.value;
+    const slotId = legacySlotSelect.value;
+    const value = legacyCanonicalValue.value.trim();
+    if (!memoryId || !slotId || !value) {
+      legacyCutoverResult.textContent = 'Select one legacy row, one slot, and type the canonical value.';
+      return;
+    }
+    legacyCutoverInFlight = true;
+    refreshLegacyInventoryButton.disabled = true;
+    previewLegacyCutoverButton.disabled = true;
+    legacyCutoverReviewToken = null;
+    confirmLegacyCutoverCheckbox.checked = false;
+    confirmLegacyCutoverCheckbox.disabled = true;
+    applyLegacyCutoverButton.disabled = true;
+    legacyCutoverApplyResult.textContent = '—';
+    legacyCutoverResult.textContent = 'BUILDING HUMAN-SELECTED LEGACY ADOPTION PREVIEW — ZERO MUTATION';
+    try {
+      const data = await api('/api/legacy-cutover/preview', {
+        user_id: userSelect.value,
+        session_id: sessionId,
+        memory_id: memoryId,
+        slot_id: slotId,
+        canonical_value: value,
+      });
+      legacyCutoverReviewToken = data.review_token || null;
+      confirmLegacyCutoverCheckbox.disabled = !legacyCutoverReviewToken || !data.apply_available;
+      applyLegacyCutoverButton.disabled = true;
+      legacyCutoverResult.textContent = JSON.stringify(data, null, 2);
+    } catch (error) {
+      legacyCutoverResult.textContent = `ERROR: ${error.message}`;
+    } finally {
+      legacyCutoverInFlight = false;
+      refreshLegacyInventoryButton.disabled = false;
+      previewLegacyCutoverButton.disabled = false;
+    }
+  });
+
+
+  confirmLegacyCutoverCheckbox.addEventListener('change', () => {
+    applyLegacyCutoverButton.disabled = !(
+      confirmLegacyCutoverCheckbox.checked && legacyCutoverReviewToken && !legacyCutoverInFlight
+    );
+  });
+
+  applyLegacyCutoverButton.addEventListener('click', async () => {
+    if (legacyCutoverInFlight || !sessionId || proposalId) return;
+    if (!legacyCutoverReviewToken || !confirmLegacyCutoverCheckbox.checked) {
+      legacyCutoverApplyResult.textContent = 'Preview and explicitly confirm the exact reviewed conversion first.';
+      return;
+    }
+    legacyCutoverInFlight = true;
+    refreshLegacyInventoryButton.disabled = true;
+    previewLegacyCutoverButton.disabled = true;
+    confirmLegacyCutoverCheckbox.disabled = true;
+    applyLegacyCutoverButton.disabled = true;
+    legacyCutoverApplyResult.textContent = 'APPLYING HUMAN-CONFIRMED SAME-LINEAGE LEGACY CUTOVER';
+    try {
+      const data = await api('/api/legacy-cutover/apply', {
+        user_id: userSelect.value,
+        session_id: sessionId,
+        review_token: legacyCutoverReviewToken,
+        confirmed: true,
+      });
+      legacyCutoverApplyResult.textContent = JSON.stringify(data, null, 2);
+      legacyCutoverReviewToken = null;
+      confirmLegacyCutoverCheckbox.checked = false;
+      const sessionData = await apiGet(`/api/state?user_id=${encodeURIComponent(userSelect.value)}&session_id=${encodeURIComponent(sessionId)}`);
+      renderSession(sessionData);
+    } catch (error) {
+      legacyCutoverApplyResult.textContent = `ERROR: ${error.message}`;
+      confirmLegacyCutoverCheckbox.disabled = false;
+      applyLegacyCutoverButton.disabled = !confirmLegacyCutoverCheckbox.checked;
+    } finally {
+      legacyCutoverInFlight = false;
+      refreshLegacyInventoryButton.disabled = false;
+      previewLegacyCutoverButton.disabled = false;
+    }
+  });
+
+
+  apiGet('/api/product-status').then(renderProductStatus).catch((error) => {
+    document.querySelector('#productModeValue').textContent = 'ERROR';
+    document.querySelector('#productStopEvidence').textContent = error.message;
+  });
+  apiGet('/api/ontology-benchmark/status').then(renderBenchmarkStatus).catch((error) => {
+    document.querySelector('#benchmarkFreezeStatus').textContent = 'ERROR';
+    document.querySelector('#benchmarkManifest').textContent = error.message;
+  });
+  refreshHeldoutStatus().catch((error) => { document.querySelector('#benchmarkHeldoutResult').textContent = error.message; });
+  resumePendingSession(userSelect.value)
+    .then((resumed) => { if (!resumed) return newSession(); })
+    .catch((error) => {
+      status.textContent = `Pending proposal resume failed: ${error.message}`;
+    });
+</script>
+</body>
+</html>

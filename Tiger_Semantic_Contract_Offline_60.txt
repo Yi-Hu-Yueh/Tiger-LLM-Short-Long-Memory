@@ -1,0 +1,471 @@
+Tiger Short/Long Memory
+SEMANTIC CONTRACT OFFLINE SCENARIOS — 60 CASES
+版本：v2
+用途：mock / deterministic / compiler / validator / state-transition 覆蓋
+注意：這 60 題不是要求真實 DeepSeek 全部跑，而是供 Codex / unittest / offline fixture 使用。
+
+每個案例都包含：
+- 類型
+- 初始狀態
+- 問題
+- 預期答案
+- 預期 deterministic 結果
+
+============================================================
+S01–S12 — SCALAR
+============================================================
+
+S01
+類型：Scalar CREATE
+初始：無 office
+問題：我的辦公室在台北。
+預期答案：已記住。
+預期結果：CREATE scalar 台北；revision +1。
+
+S02
+類型：Scalar READ
+初始：office=台北
+問題：我的辦公室在哪裡？
+預期答案：台北。
+預期結果：mutation=0；revision 不變。
+
+S03
+類型：Scalar SET
+初始：office=台北
+問題：辦公室改到新竹。
+預期答案：已更新為新竹。
+預期結果：同 memory_id；predecessor 台北；revision +1。
+
+S04
+類型：Scalar REASSERT
+初始：office=新竹
+問題：我的辦公室在新竹。
+預期答案：目前仍是新竹。
+預期結果：NOOP；無新 history；revision 不變。
+
+S05
+類型：Scalar CREATE 第二 slot
+初始：office=新竹
+問題：我的手機是 Pixel。
+預期答案：已記住。
+預期結果：新 slot；office 不變。
+
+S06
+類型：Scalar slot isolation
+初始：office=新竹, phone=Pixel
+問題：我的手機改成 iPhone。
+預期答案：已更新。
+預期結果：只改 phone。
+
+S07
+類型：Scalar unknown target
+初始：只有 car1=黑色
+問題：第二台車改成白色。
+預期答案：找不到相關記憶／請先提供第二台車。
+預期結果：mutation=0。
+
+S08
+類型：Scalar DELETE proposal
+初始：car=黑色
+問題：忘記我的車色。
+預期答案：請確認刪除。
+預期結果：Proposal only；revision 不變。
+
+S09
+類型：Scalar DELETE confirm
+初始：S08 proposal
+問題：確認執行。
+預期答案：已刪除。
+預期結果：Current delete；revision +1。
+
+S10
+類型：Scalar DELETE cancel
+初始：存在 delete proposal
+問題：取消。
+預期答案：已取消。
+預期結果：Current 不變；revision 不變。
+
+S11
+類型：Scalar oversized
+初始：無
+問題：建立超過 Scalar 限制的值。
+預期答案：無法儲存／輸入超出限制。
+預期結果：fail closed；mutation=0。
+
+S12
+類型：Scalar cross-user
+初始：user1 office=台北；user2 empty
+問題（user2）：我的辦公室在哪裡？
+預期答案：沒有相關記憶。
+預期結果：不可讀 user1。
+
+
+============================================================
+S13–S26 — SET
+============================================================
+
+S13
+類型：Set CREATE
+初始：無 group
+問題：研究小組有 Alice、Bob、Carol。
+預期答案：已記住。
+預期結果：Set exact 3 items。
+
+S14
+類型：Set READ
+初始：[Alice,Bob,Carol]
+問題：研究小組有哪些人？
+預期答案：Alice、Bob、Carol。
+預期結果：mutation=0。
+
+S15
+類型：Set ADD
+初始：[Alice,Carol]
+問題：Bob 加入研究小組。
+預期答案：已更新。
+預期結果：[Alice,Carol,Bob]。
+
+S16
+類型：Set duplicate ADD
+初始：[Alice,Bob,Carol]
+問題：Bob 加入研究小組。
+預期答案：Bob 已存在／狀態未變。
+預期結果：NOOP；revision 不變。
+
+S17
+類型：Set REMOVE proposal
+初始：[Alice,Bob,Carol]
+問題：Bob 退出研究小組。
+預期答案：請確認。
+預期結果：Proposal；Current 不變。
+
+S18
+類型：Set REMOVE confirm
+初始：S17 Proposal
+問題：確認執行。
+預期答案：已更新。
+預期結果：[Alice,Carol]；history predecessor；revision +1。
+
+S19
+類型：Set REMOVE cancel
+初始：REMOVE proposal
+問題：取消。
+預期答案：已取消。
+預期結果：Current 不變。
+
+S20
+類型：Set ambiguous remove
+初始：[Alice,Bob,Carol]
+問題：移除其中一位。
+預期答案：請問哪一位？
+預期結果：Clarify；無 Proposal。
+
+S21
+類型：Set nonexistent remove
+初始：[Alice,Carol]
+問題：Bob 退出。
+預期答案：目前沒有 Bob。
+預期結果：mutation=0。
+
+S22
+類型：Set final remove
+初始：[Alice]
+問題：Alice 退出。
+預期答案：請確認。
+預期結果：Confirm 後 []，不是 DELETE_MEMORY。
+
+S23
+類型：Set cross-collection
+初始：hiking=[Ian,Leo], photo=[Leo,Nina]
+問題：Leo 退出攝影社。
+預期答案：請確認。
+預期結果：Confirm 後 photo=[Nina]；hiking 不變。
+
+S24
+類型：Set replace full state
+初始：[Alice,Bob]
+問題：研究小組現在完整名單是 Alice、Carol。
+預期答案：已更新／依政策執行。
+預期結果：若允許 REPLACE_SET，Current=[Alice,Carol]；history 保存前值。
+
+S25
+類型：Set too many items
+初始：無
+問題：建立超過 Set item count 上限的完整集合。
+預期答案：無法儲存／超過限制。
+預期結果：fail closed。
+
+S26
+類型：Set item too long
+初始：無
+問題：建立包含超長 item 的集合。
+預期答案：無法儲存。
+預期結果：fail closed。
+
+
+============================================================
+S27–S36 — COUNT
+============================================================
+
+S27
+類型：Count CREATE
+初始：無 reading_count
+問題：讀書會有四位成員。
+預期答案：已記住 4。
+預期結果：Count=4；不可 fabricated Set。
+
+S28
+類型：Count READ
+初始：count=4
+問題：讀書會有幾個人？
+預期答案：4 位。
+預期結果：mutation=0。
+
+S29
+類型：Count absolute SET
+初始：count=4
+問題：現在一共有五位成員。
+預期答案：已更新為 5。
+預期結果：count=5；history=4。
+
+S30
+類型：Anonymous departure
+初始：count=4
+問題：其中一位成員退出。
+預期答案：需要更多資訊／不執行。
+預期結果：仍 4。
+
+S31
+類型：Anonymous join
+初始：count=4
+問題：有一位新成員加入。
+預期答案：需要更多資訊／依治理不執行匿名推導。
+預期結果：仍 4。
+
+S32
+類型：Explicit absolute after ambiguity
+初始：count=4
+問題：現在讀書會剩三位。
+預期答案：已更新為 3。
+預期結果：SET_COUNT 3。
+
+S33
+類型：Count negative invalid
+初始：count=4
+問題：將 count 設成 -1 的 mock IR。
+預期答案：拒絕。
+預期結果：fail closed。
+
+S34
+類型：Count too large
+初始：count=4
+問題：將 count 設為超出上限值。
+預期答案：拒絕。
+預期結果：fail closed。
+
+S35
+類型：Count DELETE proposal
+初始：count=4
+問題：忘記讀書會人數。
+預期答案：請確認刪除。
+預期結果：Proposal。
+
+S36
+類型：Count/Set mismatch
+初始：無
+問題：count-only semantic IR 卻要求 CREATE_SET。
+預期答案：拒絕。
+預期結果：evidence/state mismatch fail closed。
+
+
+============================================================
+S37–S46 — RECORD
+============================================================
+
+S37
+類型：Record CREATE field
+初始：無 owner
+問題：所有權人的名字是 Alice。
+預期答案：已記住。
+預期結果：owner.name=Alice。
+
+S38
+類型：Record SET_FIELD
+初始：owner.name=Alice
+問題：地址是台中。
+預期答案：已記住。
+預期結果：保留 name；新增 address。
+
+S39
+類型：Record replace field
+初始：name=Alice,address=台中
+問題：地址改成新竹。
+預期答案：已更新。
+預期結果：name 保留；address=新竹。
+
+S40
+類型：Record DELETE_FIELD proposal
+初始：name=Alice,address=新竹
+問題：忘記地址。
+預期答案：請確認。
+預期結果：Proposal only。
+
+S41
+類型：Record DELETE_FIELD confirm
+初始：S40 proposal
+問題：確認執行。
+預期答案：已刪除地址。
+預期結果：record={name:Alice}。
+
+S42
+類型：Record final-field delete
+初始：record={name:Alice}
+問題：忘記名字。
+預期答案：請確認。
+預期結果：Confirm 後 {}。
+
+S43
+類型：Record unknown field delete
+初始：record={name:Alice}
+問題：刪除地址。
+預期答案：找不到 address。
+預期結果：mutation=0。
+
+S44
+類型：Record ambiguous field delete
+初始：record={name:Alice,address:台中}
+問題：刪掉其中一個欄位。
+預期答案：請問哪個欄位？
+預期結果：Clarify。
+
+S45
+類型：Record whole delete
+初始：record exists
+問題：忘記整筆所有權人資料。
+預期答案：請確認。
+預期結果：DELETE_MEMORY proposal。
+
+S46
+類型：Record field limit
+初始：record 接近欄位上限
+問題：加入超過上限的新欄位。
+預期答案：拒絕。
+預期結果：fail closed。
+
+
+============================================================
+S47–S54 — READ / HISTORY / UNKNOWN / NOOP
+============================================================
+
+S47
+類型：Historical read
+初始：office 台北 -> 新竹
+問題：我之前說辦公室在哪裡？
+預期答案：台北或安全降級。
+預期結果：Current/History 不變。
+
+S48
+類型：Combined current/history
+初始：car 白 -> 黑
+問題：現在什麼顏色？之前呢？
+預期答案：現在黑、之前白。
+預期結果：read-only。
+
+S49
+類型：Unknown read
+初始：無 roommate location
+問題：室友住哪裡？
+預期答案：沒有相關記憶。
+預期結果：mutation=0。
+
+S50
+類型：NOOP reassert
+初始：office=新竹
+問題：office=新竹 的 mock semantic IR
+預期答案：狀態未變。
+預期結果：revision 不變。
+
+S51
+類型：Malformed READ
+初始：office=新竹
+問題：READ IR 帶 illegal mutation arguments。
+預期答案：拒絕。
+預期結果：fail closed。
+
+S52
+類型：Wrong read ID user
+初始：user1 m1；user2 request m1
+問題：user2 READ m1。
+預期答案：拒絕／unknown。
+預期結果：不可讀 foreign ID。
+
+S53
+類型：Read no mutation
+初始：多筆 memories
+問題：正常 READ。
+預期答案：依 selected IDs render。
+預期結果：Current/History/revision 不變。
+
+S54
+類型：Historical foreign ID
+初始：user1 history h1
+問題：user2 request h1。
+預期答案：拒絕。
+預期結果：cross-user protection。
+
+
+============================================================
+S55–S60 — CONTROL / ISOLATION / TRANSACTION
+============================================================
+
+S55
+類型：Clarification create
+初始：set=[Alice,Bob]
+問題：移除其中一個。
+預期答案：請問哪位？
+預期結果：Clarification state；無 mutation。
+
+S56
+類型：Clarification continuation
+初始：active clarification candidates Alice/Bob
+問題：Alice。
+預期答案：請確認移除 Alice。
+預期結果：concrete Proposal。
+
+S57
+類型：Unrelated request isolation
+初始：active clarification
+問題：我的生日月份是五月。
+預期答案：已記住五月。
+預期結果：新的 Scalar；不得誤套舊 clarification。
+
+S58
+類型：Stale proposal
+初始：proposal base_revision=4；Current revision=5
+問題：Confirm。
+預期答案：無法執行／proposal 已過期。
+預期結果：fail closed。
+
+S59
+類型：Proposal replay
+初始：proposal 已成功 Confirm 並 consumed
+問題：再次 Confirm 同 proposal。
+預期答案：不可重複執行。
+預期結果：mutation=0。
+
+S60
+類型：Atomic rollback
+初始：合法 mutation，注入 DB write failure
+問題：執行 mutation。
+預期答案：操作失敗。
+預期結果：
+- Current 不變
+- History 不變
+- revision 不變
+- messages 不部分提交
+- Proposal / Clarification 狀態一致
+
+
+============================================================
+SEMANTIC CONTRACT OFFLINE 60 CASES END
+============================================================

@@ -1,0 +1,289 @@
+Tiger Short/Long Memory - Final Phase 6 Verification Evidence
+==============================================================
+
+Date: 2026-09-17 (Asia/Taipei)
+Phase: 6 - Acceptance and release evidence
+Runtime: Python 3.14.7; SQLite schema v4
+Model configuration: deepseek-v4-pro; thinking disabled
+Typed protocol: TYPED_MEMORY_PROTOCOL_ENABLED=True
+
+EVIDENCE BOUNDARY
+-----------------
+- Deterministic application verification: PASS.
+- Offline/mock structured-semantic verification: PASS.
+- Real DeepSeek verification in Phase 6: NOT RUN.
+- Paid DeepSeek calls in Phase 6: 0.
+- Phase 6 manual/browser interaction: NOT RUN; automated UI guard coverage passed.
+- The 20 approved manual/semantic cases remain the user's authoritative manual
+  acceptance checklist. Mocked decisions are not reported as live semantic proof.
+
+GOVERNANCE BASELINE
+-------------------
+AGENTS.md:
+391024C452332E58F1739513D7F2FEE83C1B3DDA4D7DD0545E2CB963248880E6
+
+MEMORY_CONSISTENCY_SPEC.md:
+609F0118DAC1EBCEA7D39493B9B3C65B49A9AB870B80B310621CCEC43355CC75
+
+MEMORY_SEMANTIC_CONTRACTS.md:
+41600FF51BB3257593744C0C9AA9132C5C681E301467DA69E2DB2F10E89BEF37
+
+MEMORY_ACCEPTANCE_SUITE.md:
+4741210EF96CB8DA10F48A80B2926E5C8FE5E1BB4419577BC3BEA12450FFFA49
+
+MEMORY_IMPLEMENTATION_GAP_PLAN.md:
+4BAB94268C5521F907191DC0477549554D6613E0E726911F5DE4B3F3C00AF254
+
+All governance files were read completely before Phase 6 edits. No governance
+file was changed. Governance conflict status: NO.
+
+FINAL RUNTIME CHECKPOINT
+------------------------
+- Stable memory_id remains the only authoritative lineage identity.
+- Scalar, Set, Count and Record use typed canonical state.
+- Relation semantics use typed Set membership; there is no relation table.
+- semantic_key is descriptive metadata only.
+- Typed rendering is deterministic from canonical state.
+- Current, History, Proposal and Clarification remain distinct authority layers.
+- REMOVE_ITEM, DELETE_FIELD and DELETE_MEMORY require Proposal then local
+  Confirm/Cancel; neither endpoint calls DeepSeek.
+- Final Set item removal yields same-lineage []; final Record field removal
+  yields same-lineage {}.
+- Anonymous membership events cannot decrement a count or create an executable
+  count proposal without admitted evidence.
+- REASSERT_NOOP produces no Current change, History row or revision increment.
+- Legacy rows dual-read with typed rows. Conversion requires an explicit update,
+  exact existing ID and complete valid typed shape; it preserves ID, archives the
+  legacy predecessor and commits atomically.
+- Mixed exact typed-registry conflicts fail closed. There is no bulk or heuristic
+  conversion.
+- A normal turn uses at most one DeepSeek call and no write transaction is held
+  during the call.
+
+AUTOMATED TESTS
+---------------
+Command:
+python -W error::ResourceWarning -m unittest -v test_app.py
+
+Status: PASS (20/20)
+Result: Ran 20 tests; OK
+ResourceWarning strict mode: PASS
+Automated test count: exactly 20
+
+Final contract-class suite:
+01 scalar create/read, atomic turn and cross-session long-term memory
+02 named Set isolation, stable ID, predecessor and deterministic read
+03 whole-memory DELETE Proposal gate across typed families
+04 unresolved conversation/count policy/recent-context and read authority
+05 Clarification -> concrete Proposal -> local Confirm continuation
+06 Record SET_FIELD sibling preservation, ID and full predecessor
+07 confirmed DELETE removes only the target lineage
+08 confirmed legacy ADD proposal generates the application ID
+09 local Cancel, DELETE_FIELD confirmation and empty Record semantics
+10 stale Proposal and stale Clarification fail closed
+11 cross-user Proposal access rejection
+12 cross-session Proposal access and New Session isolation
+13 Clear User Data and other-user isolation
+14 active Proposal and shared browser request/keyboard guards
+15 reference firewall and atomic typed-decision rejection
+16 injected confirmation database failure rolls back all writes
+17 restart persistence for Proposal and Clarification
+18 strict vNext schema, typed algebra, limits, routing and policy gates
+19 additive v4 migration, mixed legacy/typed state, conversion and restart
+20 provider/schema/stale/DB failures, revision race and isolation rollback
+
+DETERMINISTIC CONTRACT FAMILY RESULTS
+-------------------------------------
+Scalar: PASS - create, replace, read, reassert, stable lineage and destructive
+delete gate are covered. Natural-language slot selection remains model-semantic.
+
+Set: PASS - create/add/remove/replace algebra, uniqueness, cross-collection
+isolation, Proposal gate and explicit [] are covered. Natural-language target
+and item selection remain model-semantic.
+
+Count: PASS - integer/range validation, explicit set and read are covered;
+anonymous member-event decrement/proposal is rejected. Evidence classification
+remains model-semantic.
+
+Record: PASS - SET_FIELD preserves siblings; DELETE_FIELD uses Proposal and can
+produce {}; whole-record deletion uses DELETE_MEMORY Proposal.
+
+Pending Proposal: PASS - creation is non-authoritative; Confirm/Cancel are local,
+scoped, revision-checked and replay-safe.
+
+Clarification: PASS - separate persisted state, scope, expiry, revision,
+continuation-field validation, unrelated-request isolation and UI separation.
+
+History: PASS - complete typed predecessor, same lineage, reassert preservation,
+delete-lineage behavior and deterministic rendering.
+
+Isolation: PASS - user, Session, slot and collection boundaries; foreign and
+cross-session proposal access rejected.
+
+Revision: PASS - only committed authoritative Current changes increment it.
+
+Atomic rollback: PASS - messages, Current, History, Proposal, Clarification and
+revision remain pre-turn on tested provider, validation, race and DB failures.
+
+Legacy coexistence: PASS - mixed reads, legacy rollback path and no guessed
+conversion. Exact-ID conversion, conflict rejection, predecessor archival,
+rollback and reopen are covered.
+
+Typed limits: PASS - all approved state, item, field, byte, input, memory,
+history, recent-context and read-reference limits fail closed where applicable.
+
+Browser guards: PASS by automated/static assertions - shared send path, Enter,
+Shift+Enter, IME state, Proposal blocking, request-in-flight protection and stale
+response context checks. No Phase 6 manual browser interaction was performed.
+
+APPROVED 20-CASE ACCEPTANCE CHECKLIST
+-------------------------------------
+This table records deterministic/mock evidence and leaves manual/live semantic
+execution explicit. OPTIONAL safe degradation is not reported as full success.
+
+Case | Class | Offline evidence | Manual/live Phase 6
+-----|-------|------------------|--------------------
+1 | HARD | DET/MOCK PASS: tests 01,18 | NOT RUN
+2 | HARD+OPTIONAL | DET/MOCK PASS: tests 18,19 | NOT RUN
+3 | OPTIONAL | DET/MOCK PASS: tests 02,18 | NOT RUN
+4 | OPTIONAL+HARD SAFETY | DET/MOCK PASS: tests 02,18 | NOT RUN
+5 | OPTIONAL+HARD SAFETY | DET/MOCK PASS: tests 02,05 | NOT RUN
+6 | OPTIONAL+HARD SAFETY | DET/MOCK PASS: tests 02,18,19 | NOT RUN
+7 | HARD | DET/MOCK PASS: tests 01,18 | NOT RUN
+8 | HARD+OPTIONAL | DET/MOCK PASS: tests 18,19 | NOT RUN
+9 | OPTIONAL+HARD SAFETY | DET/MOCK PASS: tests 04,18,19 | NOT RUN
+10 | DEFERRED+HARD SAFETY | DET/MOCK PASS: tests 04,18 | NOT RUN
+11 | HARD | DET/MOCK PASS: tests 04,05,18 | NOT RUN
+12 | HARD | DET/MOCK PASS: test 18 | NOT RUN
+13 | HARD SAFETY+HARD scalar | DET/MOCK PASS: tests 04,05,18 | NOT RUN
+14 | OPTIONAL+HARD pending safety | DET/MOCK PASS: test 05 | NOT RUN
+15 | HARD | DET/MOCK PASS: tests 10,17,18 | NOT RUN
+16 | MIXED | DET/MOCK PASS: tests 02,18 | NOT RUN
+17 | OPTIONAL | DET/MOCK PASS: tests 02,05,17 | NOT RUN
+18 | OPTIONAL+HARD SAFETY | DET/MOCK PASS: tests 02,05 | NOT RUN
+19 | HARD | DET/MOCK PASS: tests 18,19 | NOT RUN
+20 | HARD+OPTIONAL | DET/MOCK PASS: tests 04,18,19 | NOT RUN
+
+HARD result: deterministic application and mocked protocol paths PASS; live
+natural-language semantic selection was not tested in Phase 6.
+
+OPTIONAL result: admitted deterministic/mock paths and safe-degradation guards
+PASS; no OPTIONAL case is promoted to live semantic success.
+
+HARD SAFETY result: deterministic ownership, policy gates, proposal lifecycle,
+atomicity, non-hallucinating database render and fail-closed checks PASS. Correct
+wrong-but-valid semantic target selection still depends on DeepSeek.
+
+SX-01 TO SX-42 TRACEABILITY
+---------------------------
+Evidence labels: DET = deterministic application; MOCK = fake structured provider;
+LIVE = real DeepSeek. All rows below have LIVE=NOT RUN for Phase 6.
+
+Scenario | Contract focus | Automated test(s) | Manual case | Result
+---------|----------------|-------------------|-------------|-------
+SX-01 | SCALAR-CREATE | 01,18 | #1 | DET/MOCK PASS
+SX-02 | SCALAR-REPLACE | 18,19 | #2 | DET/MOCK PASS
+SX-03 | SCALAR-REASSERT | 18,19 | #19 | DET/MOCK PASS
+SX-04 | SCALAR-DELETE | 03 | none | DET/MOCK PASS
+SX-05 | SCALAR slot isolation | 11,20 | #2 | DET/MOCK PASS
+SX-06 | incomplete SCALAR-CREATE | 18 | #11/#12 | DET/MOCK fail-closed PASS
+SX-07 | SCALAR-READ | 01,18 | #1/#7 | DET/MOCK PASS
+SX-08 | HISTORY-REASSERT | 18,19 | #8/#19 | DET/MOCK PASS
+SX-09 | SET-CREATE | 02,18 | #3 | DET/MOCK PASS
+SX-10 | SET-ADD-ITEM | 02,18,19 | #6 | DET/MOCK PASS
+SX-11 | SET duplicate NOOP | 18,19 | #6/#19 | DET PASS
+SX-12 | SET-REMOVE-ITEM | 02,05 | #5/#17 | DET/MOCK PASS
+SX-13 | SET ambiguity | 04,05 | #13/#14 | DET/MOCK PASS
+SX-14 | SET cross-collection | 02,05 | #4/#5/#18 | DET/MOCK PASS
+SX-15 | absent SET item removal | 18 | #13 | DET fail-closed PASS
+SX-16 | final SET item -> [] | 05 | #14 | DET/MOCK PASS
+SX-17 | COUNT-CREATE | 04,18,19 | #9 | DET/MOCK PASS
+SX-18 | COUNT explicit set | 18,19 | #9 | DET/MOCK PASS
+SX-19 | anonymous COUNT nonexecution | 04,18 | #10 | DET/MOCK PASS
+SX-20 | explicit inventory count | 18,19 | none | DET/MOCK PASS
+SX-21 | COUNT-READ after ambiguity | 04,18 | #10/#20 | DET/MOCK PASS
+SX-22 | RECORD-SET-FIELD | 06,18,19 | none | DET/MOCK PASS
+SX-23 | RECORD-DELETE-FIELD/final {} | 09,16,18 | none | DET/MOCK PASS
+SX-24 | RECORD DELETE_MEMORY | 03,18 | none | DET/MOCK PASS
+SX-25 | ambiguous RECORD field | 18 | none | DET/MOCK fail-closed PASS
+SX-26 | RELATION-ADD via Set | 02,18 | #6/#17 | DET/MOCK PASS
+SX-27 | RELATION-REMOVE via Set | 02,05 | #18 | DET/MOCK PASS
+SX-28 | ambiguous relation target | 04,18 | #13 | DET/MOCK PASS
+SX-29 | PENDING-CREATE | 05 | #5/#14 | DET/MOCK PASS
+SX-30 | PENDING-CONFIRM | 05,06,07,08 | #5/#14 | DET PASS
+SX-31 | PENDING-CANCEL | 09 | none | DET PASS
+SX-32 | PENDING-STALE | 10 | #15/#20 | DET PASS
+SX-33 | PENDING-CONTINUATION | 05 | #14 | DET/MOCK PASS
+SX-34 | PENDING-UNRELATED | 04,05 | #11/#13/#15 | DET/MOCK PASS
+SX-35 | HISTORY-PREDECESSOR | 02,06,19 | #2/#8/#17 | DET PASS
+SX-36 | READ-HISTORY | 18 | #2/#8/#20 | DET/MOCK PASS
+SX-37 | READ-UNKNOWN | 18 | #12 | DET/MOCK PASS
+SX-38 | READ-NO-MUTATION | 18 | #20 | DET/MOCK PASS
+SX-39 | ISO-USER | 11,20 | suite-wide | DET PASS
+SX-40 | ISO-SESSION | 12 | suite-wide | DET PASS
+SX-41 | SAFE-REFERENCE | 15 | suite-wide | DET/MOCK PASS
+SX-42 | SAFE-FAIL-CLOSED | 16,20 | suite-wide | DET PASS
+
+The traceability matrix covers every approved SX scenario but does not convert
+MOCK evidence into LIVE evidence. Natural-language intent, type, target, item,
+field, continuation and relevance selection remain probabilistic model behavior.
+
+MIGRATION / RELEASE CHECKPOINT / RESTORE DRILL
+----------------------------------------------
+Status: PASS
+- The real memory.db was opened read-only for the checkpoint and remained
+  unchanged.
+- Source checkpoint: SQLite user_version 2; integrity_check=ok.
+- SQLite backup() created an isolated checkpoint database.
+- A second isolated copy was opened by the current runtime and migrated to v4.
+- Sessions, messages, Current, History and memory_state rows were compared using
+  their original columns; all five logical tables were preserved exactly.
+- Restored copy integrity_check=ok and user_version=4.
+- The required pre-v4 backup was created for the isolated restored copy.
+- All restore-drill databases and backups were removed afterward.
+- Automated test 19 separately verifies additive v4 schema, backup, rollback,
+  idempotent reopen, mixed legacy/typed data and conversion persistence.
+
+REAL DATABASE INTEGRITY
+-----------------------
+Real memory.db SHA256 before Phase 6:
+ECCA9FFF9F919E0655243AB03FB3387ACFBB7D0656EEBEC2DB47C5D51ACAAECE
+
+The same hash must be reconfirmed in the final report. No migration or test was
+run against the real database in write mode.
+
+DOCUMENTATION FINALIZATION
+--------------------------
+README.txt now documents schema v4, enabled vNext protocol, typed families,
+deterministic/model-semantic boundaries, destructive Proposal gates,
+Clarification separation, count policy, legacy coexistence/conversion, limits,
+UI guards and the answer-mode limitation.
+
+This file supersedes historical pre-policy evidence that treated anonymous
+count 4 -> 3 or direct destructive named-set removal as approved behavior.
+
+KNOWN MODEL-SEMANTIC LIMITATIONS
+--------------------------------
+- DeepSeek still interprets arbitrary natural language and chooses intent,
+  state type, target memory_id, operation, arguments, evidence, continuation,
+  answer mode and relevant read IDs.
+- The application rejects invalid, foreign, stale, conflicting and policy-
+  forbidden decisions, but cannot always detect a wrong-but-valid semantic ID.
+- answer.mode=freeform may still be selected incorrectly for a personal-memory
+  question.
+- Firewall intent classification and semantic equivalence are not formal NLP
+  proofs.
+
+PACKAGING
+---------
+The approved Phase 6 row does not explicitly require rebuilding the official ZIP.
+Official ZIP rebuilt in Phase 6: NO.
+
+FINAL STATUS
+------------
+Implementation complete: YES
+All model-semantic behavior perfect: NO (not claimed)
+Schema changed in Phase 6: NO; remains v4
+Governance changed: NO
+Paid DeepSeek calls: 0
+Remaining blocker: NONE
