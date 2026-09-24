@@ -1,5 +1,5 @@
 {
-  "project": "Tiger-Short-Long-Memory",
+  "project": "Tiger-LLM-Short-Long-Memory",
   "decision_date": "2026-09-18",
   "automatic_memory": "STOPPED_BY_FROZEN_BENCHMARK",
   "human_reviewed_memory": "RETAINED",

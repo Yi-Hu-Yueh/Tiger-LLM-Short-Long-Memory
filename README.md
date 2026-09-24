@@ -1,11 +1,11 @@
-# Tiger-Short-Long-Memory
+# Tiger-LLM-Short-Long-Memory
 (以下共花費約40天)
 
-Tiger-Short-Long-Memory 是一個本機長短期記憶系統原型
-- 第3次實作才成功(codex: pro帳號-USD100，大約花費5、6天)。 是將 "https://www.youtube.com/watch?v=XQXMSc0L5DA&t=356s" ，轉為文字    (位於Tiger-Short-Long-Memory\技術文件\LLM 記憶系統完整技術報告.txt)
+Tiger-LLM-Short-Long-Memory 是一個本機長短期記憶系統原型
+- 第3次實作才成功(codex: pro帳號-USD100，大約花費5、6天)。 是將 "https://www.youtube.com/watch?v=XQXMSc0L5DA&t=356s" ，轉為文字    (位於Tiger-LLM-Short-Long-Memory\技術文件\LLM 記憶系統完整技術報告.txt)
 
           通過"20個測試案例.txt"的手動測試。
-		  Tiger-Short-Long-Memory_系統架構.docx
+		  Tiger-LLM-Short-Long-Memory_系統架構.docx
 
 - 第1次是叫gpt去找20篇LLM記憶相關的論文，去實作，結果失敗。(花費約30天)
 - 第2次是google幾篇LLM的短中期記憶文章，結果失敗，其它包含亞馬遜幾篇相關技術文件。
@@ -91,7 +91,7 @@ Structured Memory V2 不依賴 DeepSeek，且不整合失敗的 V2-1A semantic a
 主要檔案：
 
 ```text
-Tiger-Short-Long-Memory/
+Tiger-LLM-Short-Long-Memory/
 ├─ app.py
 ├─ structured_app.py
 ├─ memory_core.py

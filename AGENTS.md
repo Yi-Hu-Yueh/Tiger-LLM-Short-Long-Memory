@@ -540,7 +540,7 @@ Do not call a code-level assertion a manual browser verification.
 
 These instructions apply to:
 
-D:\0TIGER\6months\PythonAPIDevelopment\Tiger-Short-Long-Memory
+D:\0TIGER\6months\PythonAPIDevelopment\Tiger-LLM-Short-Long-Memory
 
 and all subdirectories unless a more specific `AGENTS.md` explicitly overrides them.
 
